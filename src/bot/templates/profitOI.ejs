@@ -1,0 +1,41 @@
+{
+    OI backtest indicator
+    Author: t.me/edubbulhoes
+}
+input
+    HistogramOI(False);
+var 
+    dt: Array[0..<%= qte %>] of Integer;
+    fVWAP: Array[0..<%= qte %>] of Float;
+    fHighSD: Array[0..<%= qte %>] of Float;
+    fLowSD: Array[0..<%= qte %>] of Float;
+    fOI: Array[0..<%= qte %>] of Float;
+
+    qte, i: Integer;
+begin
+<% for(var i=0; i<qte; i++) { %>
+    dt[<%= i %>] := <%= oi[i].date %>;
+    fVWAP[<%= i %>] := <%= oi[i].vwap %>;
+    fHighSD[<%= i %>] := <%= oi[i].highSD %>;
+    fLowSD[<%= i %>] := <%= oi[i].lowSD %>;
+    fOI[<%= i %>] := <%= oi[i].volume %>;
+<% } %>
+    qte := <%= qte %>;
+
+    if (date >= dt[0]) then
+    begin
+        for i:=0 to qte do
+        begin
+            if (date = dt[i]) then
+            begin
+                if (HistogramOI) then plot(fOI[i])
+                else
+                begin
+                    plot(fVWAP[i]);
+                    plot2(fHighSD[i]);
+                    plot3(fLowSD[i]);
+                end;
+            end;
+        end;
+    end;   
+end;

@@ -1,0 +1,37 @@
+{
+    PTAX backtest indicator
+    Author: t.me/edubbulhoes
+}
+var 
+    dt: Array[0..<%= qte %>] of Integer;
+    fPtaxFut_vwap:  Array[0..<%= qte %>] of Float;
+    fPtaxSpot_vwap:  Array[0..<%= qte %>] of Float;
+
+    fPtaxFut_avg:  Array[0..<%= qte %>] of Float;
+    fPtaxSpot_avg:  Array[0..<%= qte %>] of Float;
+
+    qte, i: Integer;
+begin
+<% for(var i=0; i<qte; i++) { %>
+    dt[<%= i %>] := <%= ptax[i].date %>;
+    fPtaxFut_vwap[<%= i %>] := <%= ptax[i].fut_vwap %>;
+    fPtaxSpot_vwap[<%= i %>] := <%= ptax[i].spot_vwap %>;
+    fPtaxFut_avg[<%= i %>] := <%= ptax[i].fut_avg %>;
+    fPtaxSpot_avg[<%= i %>] := <%= ptax[i].spot_avg %>;
+<% } %>
+    qte := <%= qte %>;
+
+    if (date >= dt[0]) then
+    begin
+        for i:=0 to qte do
+        begin
+            if (date = dt[i]) then
+            begin
+                plot(fPtaxFut_vwap[i]);
+                plot2(fPtaxSpot_vwap[i]);
+                plot3(fPtaxFut_avg[i]);
+                plot4(fPtaxSpot_avg[i]);
+            end;
+        end;
+    end;   
+end;

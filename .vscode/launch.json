@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Docker: Attach to Node",
+      "port": 9229,
+      "request": "attach",
+      "type": "pwa-node",
+      "address": "localhost",
+      "localRoot": "${workspaceFolder}",
+      "remoteRoot": "/app/myoraculum-botloader",
+      "skipFiles": ["<node_internals>/**"],
+      "sourceMapPathOverrides": {
+        "/app/myoraculum-botloader/src/**": "${workspaceRoot}/src/**",
+      },
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/**",
+        "!**/node_modules/**"
+      ],        
+    },
+/* 
+Puppeteer debuging:
+- puppeteer.launch() parameter: --remote-debugging-address=0.0.0.0
+- puppeteer.launch() parameter: --remote-debugging-port=9228
+- Docker-compose.yml ports: - 9228:9228
+- Run node debug to stop after puppeteer.launch()
+- Open Chrome browser: chrome://inspect/#devices and add Remote Target: localhost:9228
+*/
+  ]
+}

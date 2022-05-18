@@ -1,0 +1,281 @@
+import { MigrationInterface, QueryRunner, Table, TableIndex } from 'typeorm';
+
+export default class tblB3SpotPlayers1634684537877
+  implements MigrationInterface
+{
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    queryRunner.createTable(
+      new Table({
+        name: 'b3-spot-players',
+        columns: [
+          {
+            name: 'timestamp-load',
+            type: 'timestamptz',
+            isNullable: false,
+          },
+          {
+            name: 'start-date',
+            type: 'Date',
+            isNullable: false,
+          },
+          {
+            name: 'end-date',
+            type: 'Date',
+            isNullable: false,
+          },
+          {
+            name: 'ind-inv-buy',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'ind-inv-buy-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'ind-inv-sell',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'ind-inv-sell-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'inv-club-buy',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'inv-club-buy-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'inv-club-sell',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'inv-club-sell-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'inst-inv-buy',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'inst-inv-buy-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'inst-inv-sell',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'inst-inv-sell-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'for-inv-buy',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'for-inv-buy-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'for-inv-sell',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'for-inv-sell-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pub-pri-corp-buy',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pub-pri-corp-buy-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pub-pri-corp-sell',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pub-pri-corp-sell-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'fin-inst-buy',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'fin-inst-buy-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'fin-inst-sell',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'fin-inst-sell-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'others-buy',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'others-buy-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'others-sell',
+            type: 'numeric',
+            precision: 14,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'others-sell-perc',
+            type: 'numeric',
+            precision: 5,
+            scale: 2,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'has-unknown-column',
+            type: 'boolean',
+            default: false,
+            isNullable: false,
+          },
+          {
+            name: 'json-data',
+            type: 'text',
+            isNullable: false,
+          },
+        ],
+      }),
+    );
+
+    await queryRunner.createIndex(
+      'b3-spot-players',
+      new TableIndex({
+        name: `IDX_2be198f3-64cc-4a9a-9a66-c1c3b5362ed1`,
+        columnNames: ['start-date', 'end-date'],
+      }),
+    );
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.dropIndex(
+      'b3-spot-players',
+      'IDX_2be198f3-64cc-4a9a-9a66-c1c3b5362ed1',
+    );
+    await queryRunner.dropTable('b3-spot-players');
+  }
+}

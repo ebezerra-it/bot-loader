@@ -1,0 +1,222 @@
+import { MigrationInterface, QueryRunner, Table } from 'typeorm';
+import { TCurrencyCode } from '../../controllers/tcountry';
+
+export default class tblBcbPtax1626314657024 implements MigrationInterface {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.createTable(
+      new Table({
+        name: 'bcb-ptax',
+        columns: [
+          {
+            name: 'date',
+            type: 'date',
+            isNullable: false,
+            isPrimary: true,
+          },
+          {
+            name: 'currency-code',
+            type: 'enum',
+            enum: Object.keys(TCurrencyCode),
+            enumName: 'TCurrencyCode',
+            isNullable: false,
+            isPrimary: true,
+          },
+          {
+            name: 'last_update',
+            type: 'timestamptz',
+            isNullable: false,
+          },
+          {
+            name: 'p1_datetime',
+            type: 'timestamptz',
+            isNullable: true,
+          },
+          {
+            name: 'pbrl_p1_buy',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pbrl_p1_sell',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pusd_p1_buy',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pusd_p1_sell',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'p2_datetime',
+            type: 'timestamptz',
+            isNullable: true,
+          },
+          {
+            name: 'pbrl_p2_buy',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pbrl_p2_sell',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pusd_p2_buy',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pusd_p2_sell',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'p3_datetime',
+            type: 'timestamptz',
+            isNullable: true,
+          },
+          {
+            name: 'pbrl_p3_buy',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pbrl_p3_sell',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pusd_p3_buy',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pusd_p3_sell',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'p4_datetime',
+            type: 'timestamptz',
+            isNullable: true,
+          },
+          {
+            name: 'pbrl_p4_buy',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pbrl_p4_sell',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pusd_p4_buy',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pusd_p4_sell',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'ptax_datetime',
+            type: 'timestamptz',
+            isNullable: true,
+          },
+          {
+            name: 'pbrl_ptax_buy',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pbrl_ptax_sell',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pusd_ptax_buy',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+          {
+            name: 'pusd_ptax_sell',
+            type: 'numeric',
+            precision: 12,
+            scale: 5,
+            isNullable: true,
+            unsigned: true,
+          },
+        ],
+      }),
+    );
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.dropTable('bcb-ptax');
+  }
+}

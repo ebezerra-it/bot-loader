@@ -1,0 +1,477 @@
+[
+  {
+    "globexcode": "6L",
+    "caption": "Brazilian Real",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "ES",
+    "caption": "E-mini S&P 500",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "MES",
+    "caption": "Micro E-mini S&P 500",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "NQ",
+    "caption": "E-mini Nasdaq-100",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "MNQ",
+    "caption": "Micro E-mini Nasdaq-100",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "6E",
+    "caption": "Euro FX",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "E7",
+    "caption": "E-mini Euro FX",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "M6E",
+    "caption": "Micro EUR/USD",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "6B",
+    "caption": "British Pound",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "M6B",
+    "caption": "Micro GBP/USD",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "6J",
+    "caption": "Japanese Yen",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "J7",
+    "caption": "E-mini Japanese Yen",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "MJY",
+    "caption": "Micro JPY/USD",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "6C",
+    "caption": "Canadian Dollar",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "MCD",
+    "caption": "Micro CAD/USD Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "6A",
+    "caption": "Australian Dollar",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "M6A",
+    "caption": "Micro AUD/USD",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "6S",
+    "caption": "Swiss Franc",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "MSF",
+    "caption": "Micro CHF/USD",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "6M",
+    "caption": "Mexican Peso",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "6N",
+    "caption": "New Zealand Dollar Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "CL",
+    "caption": "Crude Oil Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "QM",
+    "caption": "E-mini Crude Oil Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "NG",
+    "caption": "Henry Hub Natural Gas Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "ZC",
+    "caption": "Corn Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "XC",
+    "caption": "Mini-Corn Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+
+  {
+    "globexcode": "ZS",
+    "caption": "Soybean Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "XK",
+    "caption": "Mini Soybean Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "ZM",
+    "caption": "Soybean Meal Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "LE",
+    "caption": "Live Cattle Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "GF",
+    "caption": "Feeder Cattle Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "HE",
+    "caption": "Lean Hog Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "RTY",
+    "caption": "E-mini Russell 2000 Index Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "M2K",
+    "caption": "Micro E-mini Russell 2000 Index Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "IBV",
+    "caption": "USD-Denominated Ibovespa Index Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "ZL",
+    "caption": "Soybean Oil Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "YM",
+    "caption": "E-mini Dow ($5) Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "RP",
+    "caption": "Euro/British Pound Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "RY",
+    "caption": "Euro/Japanese Yen Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "RF",
+    "caption": "Euro/Swiss Franc Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "PJY",
+    "caption": "British Pound/Japanese Yen Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "PSF",
+    "caption": "British Pound/Swiss Franc Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "6R",
+    "caption": "Russian Ruble Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "GE",
+    "caption": "Eurodollar Interest Rate Futures",
+    "summaryFutures": true,
+    "summaryOptions": false,
+    "chartLoadFutures": false,
+    "active": true
+  },
+  {
+    "globexcode": "GC",
+    "caption": "Gold Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "QO",
+    "caption": "E-mini Gold Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "MGC",
+    "caption": "Micro Gold Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+
+  {
+    "globexcode": "SI",
+    "caption": "Silver Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "QI",
+    "caption": "E-mini Silver Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "SIL",
+    "caption": "Micro Silver Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "HG",
+    "caption": "Copper Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "QC",
+    "caption": "E-mini Copper Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+
+  {
+    "globexcode": "PL",
+    "caption": "Platinum Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "BTC",
+    "caption": "Bitcoin Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "MBT",
+    "caption": "Micro Bitcoin Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "ETH",
+    "caption": "Ether Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "MET",
+    "caption": "Micro Ether Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "ZW",
+    "caption": "Chicago SRW Wheat Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  },
+  {
+    "globexcode": "XW",
+    "caption": "Mini-sized Chicago SRW Wheat Futures",
+    "summaryFutures": true,
+    "summaryOptions": true,
+    "chartLoadFutures": true,
+    "active": true
+  }
+]

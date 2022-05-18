@@ -1,0 +1,63 @@
+version: "3"
+
+services:
+  myoraculum-botloader:
+    env_file:
+      - dev.env
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    
+    container_name: myoraculum-botloader
+    volumes: 
+      - ./:/app/myoraculum-botloader
+    
+    command:
+      - /bin/bash
+      - -c
+      - |
+        yarn dev:typeorm migration:run
+#        yarn dev
+#        yarn dev:cloudtransfer
+#        yarn dev:tsloader
+#        yarn dev:chartloader
+#        sleep infinity
+
+    network_mode: service:myoraculum-postgres
+    
+    depends_on: 
+      myoraculum-postgres:
+        condition: service_healthy
+
+  myoraculum-postgres:
+    image: myoraculum-postgres-image
+    hostname: myoraculum-postgres
+    build:
+      context: ./
+      dockerfile: Dockerfile_postgres
+      args:
+        DB_NAME: ${DB_NAME}
+    healthcheck:
+      test: "exit 0"
+    container_name: myoraculum-postgres
+    restart: always
+    environment:
+      TZ: ${TZ}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+      PGDATA: /var/lib/postgresql/data
+      PGPORT: ${DB_PORT}
+      HOST_ADDR: ${HOST_ADDR}
+    command: postgres -c hba_file=/var/lib/postgresql/pg_hba.conf -c ssl=on -c ssl_cert_file=/var/lib/postgresql/server.crt -c ssl_key_file=/var/lib/postgresql/server.key
+    ports:
+      - ${DB_PORT}:${DB_PORT}
+      - ${TELEGRAM_API_PORT}:${TELEGRAM_API_PORT}
+      - ${PROFIT_API_PORT}:${PROFIT_API_PORT}
+      - 9228:9228 #Puppeteer debug port - open chrome://inspect/#devices and add localhost:9228
+      - 9229:9229 #Node debug port
+    volumes: 
+      - myoraculum-postgres_data:/var/lib/postgresql/data
+
+volumes:
+  myoraculum-postgres_data:

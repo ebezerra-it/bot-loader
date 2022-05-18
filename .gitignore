@@ -1,0 +1,8 @@
+node_modules/
+build/
+tmp/
+temp/
+data/
+profit/
+cert/ssl/
+*.log

@@ -1,0 +1,34 @@
+{
+    PLAYERS backtest indicator
+    Author: t.me/edubbulhoes
+}
+var 
+    dt: Array[0..<%= qte %>] of Integer;
+    fForeignBal: Array[0..<%= qte %>] of Float;
+    fNationalBal: Array[0..<%= qte %>] of Float;
+    fBankBal: Array[0..<%= qte %>] of Float;
+
+    qte, i: Integer;
+begin
+<% for(var i=0; i<qte; i++) { %>
+    dt[<%= i %>] := <%= players[i].date %>;
+    fForeignBal[<%= i %>] := <%= players[i].foreignBal %>;
+    fNationalBal[<%= i %>] := <%= players[i].nationalBal %>;
+    fBankBal[<%= i %>] := <%= players[i].bankBal %>;
+
+<% } %>
+    qte := <%= qte %>;
+
+    if (date >= dt[0]) then
+    begin
+        for i:=0 to qte do
+        begin
+            if (date = dt[i]) then
+            begin
+                plot(fForeignBal[i]);
+                plot2(fNationalBal[i]);
+                plot3(fBankBal[i]);
+            end;
+        end;
+    end;   
+end;

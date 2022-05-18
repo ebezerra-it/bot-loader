@@ -1,0 +1,67 @@
+COMMANDS: [optional parameters]
+<b>/help </b>
+Shows this help message.
+
+<b>/start </b>
+Sends a new token to user e-mail if user token is not active and valid.
+
+<b>/start TOKEN </b>
+Activates user token. When it expires, the user access will be denied.
+
+<b>/loadstatus [LAST|dd/MM/yyyy]</b>
+Shows load status from the last execution or in a given date.
+
+<b>/tracelog [on/off]</b>
+Toggle user access to receive messages from load process.
+
+<b>/schedule [SHOW]</b>
+Exhibits all schedules.
+
+<b>/schedule on [Schedule_Name]</b>
+Activates all or a specific schedule.
+
+<b>/schedule off [Schedule_Name]</b>
+Deactivates all or a specific schedule.
+
+<b>/schedule MAXINSTANCES=[0-9] Schedule_Name</b>
+Changes maximum load/reload instances for a specific schedule.
+
+<b>/user [show]</b>
+Exhibits all regitered users.
+
+<b>/user new "Firstname Lastname" username email@email.email</b>
+Registers a new user with default user type.
+
+<b>/user on|off username</b>
+Activates|deactivates user. User type can't be OWNER.
+
+<b>/user ban username dd/MM/yyyy [HH:mm]</b>
+Bans user until given date and time 23:59:59 or a specific date and time.
+
+<b>/user unban username</b>
+Unban user.
+
+<b>/user promote|demote username</b>
+Promotes username to ADMINISTRATOR or demotes it back to DEFAULT. User type OWNER can not be promoted nor demoted.
+
+<b>/exchangetz [show]</b>
+Lists all exchanges timezones registered.
+
+<b>/exchangetz add exchange country [+|-]utc_offset dd/MM/yyyy</b>
+Adds a new exchange timezone. 
+country must be a 2-digit code, eg: BR. 
+utc_offset must be a integer from 0 to 99.
+
+<b>/exchangetz del exchange dd/MM/yyyy</b>
+Deletes an exchage timezone.
+
+<b>/reprocess "Schedule1, ScheduleN" dd/MM/yyyy [dd/MM/yyyy] </b>
+Creates reprocessing jobs for the specified schedules on a single date or a given period.
+
+<b>/globalparam [show]</b>
+Lists all global parameters.
+
+<b>/globalparam updt param=new_value </b>
+Updates a global parameter with a specified value.
+
+For further assistance, contact your administrator.

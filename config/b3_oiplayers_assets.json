@@ -1,0 +1,392 @@
+[
+    {
+      "code": "AFS",
+      "type": "FUTURES",
+      "caption": "RANDE DA AFRICA DO SUL (TIPO A)"
+    },
+    {
+      "code": "AUD",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE DÓLAR AUSTRALIANO"
+    },
+    {
+      "code": "AUS",
+      "type": "FUTURES",
+      "caption": "DÓLAR AUSTRALIANO (TIPO B)"
+    },
+    {
+      "code": "B3SAO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE B3SA3"
+    },
+    { "code": "BRI", "type": "FUTURES", "caption": "IBRX-50" },
+    {
+      "code": "CAD",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE DÓLAR CANADENSE"
+    },
+    {
+      "code": "CAN",
+      "type": "FUTURES",
+      "caption": "DÓLAR CANADENSE (TIPO A)"
+    },
+    {
+      "code": "CCROO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE CCRO3"
+    },
+    {
+      "code": "CHF",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO FRANCO SUÍÇO"
+    },
+    {
+      "code": "CHL",
+      "type": "FUTURES",
+      "caption": "PESO CHILENO (TIPO A)"
+    },
+    {
+      "code": "CIELO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE CIEL3"
+    },
+    {
+      "code": "CLP",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO PESO CHILENO"
+    },
+    {
+      "code": "CMIGP",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE CMIG4"
+    },
+    {
+      "code": "CNH",
+      "type": "FUTURES",
+      "caption": "IUAN CHINÊS (TIPO A)"
+    },
+    { "code": "CNY", "type": "FUTURES", "caption": "MERCADO FUTURO IUAN" },
+    {
+      "code": "DAP",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE CUPOM DE DI X IPCA"
+    },
+    {
+      "code": "DAX",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE DAX"
+    },
+    {
+      "code": "DDI",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE CUPOM CAMBIAL - DDI"
+    },
+    {
+      "code": "DI1",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE TAXA DE JURO"
+    },
+    {
+      "code": "D13",
+      "type": "OPTIONS_CALL",
+      "caption":
+        "MERCADO DE OPÇÕES DE COMPRA DE DI - DI DE UM DIA - SÉRIES TIPO 2"
+    },
+    {
+      "code": "D13",
+      "type": "OPTIONS_PUT",
+      "caption":
+        "MERCADO DE OPÇÕES DE VENDA DE DI - DI DE UM DIA - SÉRIES TIPO 2"
+    },
+    {
+      "code": "D13",
+      "type": "OPTIONS_CALL",
+      "caption":
+        "MERCADO DE OPÇÕES DE COMPRA DE DI - DI DE UM DIA - SÉRIES TIPO 3"
+    },
+    {
+      "code": "D13",
+      "type": "OPTIONS_PUT",
+      "caption":
+        "MERCADO DE OPÇÕES DE VENDA DE DI - DI DE UM DIA - SÉRIES TIPO 3"
+    },
+    {
+      "code": "DOL",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE DÓLAR"
+    },
+    {
+      "code": "DOL",
+      "type": "OPTIONS_CALL",
+      "caption": "MERCADO DE OPÇÕES DE COMPRA DE DÓLAR COMERCIAL"
+    },
+    {
+      "code": "DOL",
+      "type": "OPTIONS_PUT",
+      "caption": "MERCADO DE OPÇÕES DE VENDA DE DÓLAR COMERCIAL"
+    },
+    { "code": "EUP", "type": "FUTURES", "caption": "EURO (TIPO B)" },
+    {
+      "code": "EUR",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE EURO"
+    },
+    {
+      "code": "ESX",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE EURO STOXX 50"
+    },
+    {
+      "code": "GBP",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE LIBRA ESTERLINA"
+    },
+    {
+      "code": "GBR",
+      "type": "FUTURES",
+      "caption": "LIBRA ESTERLINA (TIPO B)"
+    },
+    {
+      "code": "HYPEO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE HYPE3"
+    },
+    {
+      "code": "IND",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE IBOVESPA"
+    },
+    {
+      "code": "ISP",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE S&P 500"
+    },
+    {
+      "code": "JAP",
+      "type": "FUTURES",
+      "caption": "IENE JAPONÊS (TIPO A)"
+    },
+    {
+      "code": "JPY",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE IENE"
+    },
+    {
+      "code": "MEX",
+      "type": "FUTURES",
+      "caption": "PESO MEXICANO (TIPO A)"
+    },
+    {
+      "code": "MXN",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE PESO MEXICANO"
+    },
+    {
+      "code": "NOK",
+      "type": "FUTURES",
+      "caption": "COROA NORUEGUESA (TIPO A)"
+    },
+    {
+      "code": "NZD",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DÓLAR DA NOVA ZELÂNDIA"
+    },
+    {
+      "code": "NZL",
+      "type": "FUTURES",
+      "caption": "DÓLAR NOVA ZELANDIA (TIPO B)"
+    },
+    {
+      "code": "PETRP",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE PETR4"
+    },
+    {
+      "code": "PSSAO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE PSSA3"
+    },
+    {
+      "code": "RUB",
+      "type": "FUTURES",
+      "caption": "RUBLO RUSSO (TIPO A)"
+    },
+    {
+      "code": "SEK",
+      "type": "FUTURES",
+      "caption": "COROA SUECA (TIPO A)"
+    },
+    {
+      "code": "SWI",
+      "type": "FUTURES",
+      "caption": "FRANCO SUIÇO (TIPO A)"
+    },
+    {
+      "code": "T10",
+      "type": "FUTURES",
+      "caption": "US T-NOTE 10 ANOS FUTURO"
+    },
+    { "code": "TUQ", "type": "FUTURES", "caption": "LIRA TURCA (TIPO A)" },
+    {
+      "code": "USIMA",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE USIM5"
+    },
+    {
+      "code": "VALEO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE VALE3"
+    },
+    {
+      "code": "VVARO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE VVAR3"
+    },
+    { "code": "WDO", "type": "FUTURES", "caption": "DÓLAR MINI - WDO" },
+    {
+      "code": "WIN",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO FRACIONÁRIO DE IBOVESPA MINI"
+    },
+    { "code": "WSP", "type": "FUTURES", "caption": "S&P 500" },
+    {
+      "code": "ZAR",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO RANDE DA ÁFRICA DO SUL"
+    },
+    {
+      "code": "CPM",
+      "type": "OPTIONS_CALL",
+      "caption": "MERCADO DE OPÇÕES DE COMPRA DE CPM - COPOM"
+    },
+    {
+      "code": "CPM",
+      "type": "OPTIONS_PUT",
+      "caption": "MERCADO DE OPÇÕES DE VENDA DE CPM - COPOM"
+    },
+    {
+      "code": "IDI",
+      "type": "OPTIONS_CALL",
+      "caption": "MERCADO DE OPÇÕES DE COMPRA DE ÍNDICE IDI"
+    },
+    {
+      "code": "IDI",
+      "type": "OPTIONS_PUT",
+      "caption": "MERCADO DE OPÇÕES DE VENDA DE ÍNDICE IDI"
+    },
+    {
+      "code": "ISP",
+      "type": "OPTIONS_CALL",
+      "caption": "MERCADO DE OPÇÕES DE COMPRA DE S&P 500"
+    },
+    {
+      "code": "ISP",
+      "type": "OPTIONS_PUT",
+      "caption": "MERCADO DE OPÇÕES DE VENDA DE S&P 500"
+    },
+    {
+      "code": "SCS",
+      "type": "FUTURES",
+      "caption": "MERCADO SWAP CAMBIAL COM AJUSTE (SCS)"
+    },
+    {
+      "code": "COGNO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE COGNO"
+    },
+    {
+      "code": "INK",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE INDICE NIKKEI"
+    },
+    {
+      "code": "PCARO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE PCARO"
+    },
+    {
+      "code": "VIIAO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE VIIAO"
+    },
+    {
+      "code": "CCM",
+      "type": "FUTURES",
+      "caption": "FUTURO DE MILHO COM LIQUIDACAO FINANCEIRA (CCM)"
+    },
+    {
+      "code": "CCM",
+      "type": "OPTIONS_CALL",
+      "caption": "MERCADO DE OPCOES DE COMPRA DE MILHO"
+    },
+    {
+      "code": "CCM",
+      "type": "OPTIONS_PUT",
+      "caption": "MERCADO DE OPCOES DE VENDA DE MILHO"
+    },
+    {
+      "code": "BGI",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE BOI GORDO"
+    },
+    {
+      "code": "BGI",
+      "type": "OPTIONS_CALL",
+      "caption": "MERCADO DE OPCOES DE COMPRA DE BOI GORDO"
+    },
+    {
+      "code": "BGI",
+      "type": "OPTIONS_PUT",
+      "caption": "MERCADO DE OPCOES DE VENDA DE BOI GORDO"
+    },
+    {
+      "code": "ETH",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE ETANOL"
+    },
+    {
+      "code": "ETH",
+      "type": "OPTIONS_CALL",
+      "caption": "MERCADO DE OPCOES DE COMPRA DE ETANOL HIDRATADO"
+    },
+    {
+      "code": "ETH",
+      "type": "OPTIONS_PUT",
+      "caption": "MERCADO DE OPCOES DE VENDA DE ETANOL HIDRATADO"
+    },
+    {
+      "code": "ICF",
+      "type": "FUTURES",
+      "caption": "CAFE ARABICA 4/5"
+    },
+    {
+      "code": "ICF",
+      "type": "OPTIONS_CALL",
+      "caption": "MERCADO DE OPCOES DE COMPRA DE CAFE ARABICA 4/5"
+    },
+    {
+      "code": "ICF",
+      "type": "OPTIONS_PUT",
+      "caption": "MERCADO DE OPCOES DE VENDA DE CAFE ARABICA 4/5"
+    },
+    {
+      "code": "SJC",
+      "type": "FUTURES",
+      "caption": "MERCADO FUTURO DE SOJA CME GROUP"
+    },
+    {
+      "code": "SJC",
+      "type": "OPTIONS_CALL",
+      "caption": "MERCADO DE OPCOES DE COMPRA DE SOJA FINANCEIRA CROSS LISTING"
+    },
+    {
+      "code": "SJC",
+      "type": "OPTIONS_PUT",
+      "caption": "MERCADO DE OPCOES DE VENDA DE SOJA FINANCEIRA CROSS LISTING"
+    },
+    {
+      "code": "SOY",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE SOJA BRASIL"
+    }
+  ]

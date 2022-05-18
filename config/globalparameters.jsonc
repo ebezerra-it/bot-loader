@@ -1,0 +1,75 @@
+{
+// [Starts/Stops service]
+"RUN_SERVICE": "TRUE",
+
+// [General parameters]
+"DB_CONNECT_RETRY_INTERVAL": "120", // Unit time: seconds
+"DB_CONNECT_RETRIES": "-1",
+"LOG_FILES_DIRECTORY": "log",
+"DEFAULT_SCHEDULE_CRON": "0 0 0 31 2 *",
+"DEFAULT_SCHEDULE_ADJUST": "-1", // Unit time: days
+"DEFAULT_SCHEDULE_MAXINSTANCES": "1",
+"QUERY_INTERVAL": "2", // Unit time: seconds
+"QUERY_RETRIES": "10",
+"QUERY_RETRY_INTERVAL": "2", // Unit time: seconds
+"QUERY_RETRY_EXPONENTIAL": "TRUE",
+"QUERY_RETRY_EXPONENTIAL_MAX": "3600", // Unit time: seconds
+"REPROCESS_FINISHED_INTERVAL": "3600", // Unit time: seconds
+"CALENDAR_INVESTINGCOM_TIMEZONE": "12", // Investing.com calendar code - America/Sao_Paulo
+
+// [B3 and BCB procedures]
+"BCB_PTAX_CURRENCIES": "USD",   //Pattern: 3-letters currency code comma-delimited list. Use ALL to retrieve all known available currencies. Example: USD,GBP,MXN
+"B3_REPORT_SUMMARY_ASSETS": "ALL",  //Pattern: Asset code list, comma delimited. Usa ALL to retrieve all known available asset codes. Example: DOL,WDO,IND,WIN
+"B3_TIMESNSALES_CSVFILE_SEPARATOR": ";",
+"B3_TIMESNSALES_ASSETS_REGEX": "ALL", //Pattern: Blank or ASSET1_REGEX[@], ASSET2_REGEX, ...  @ => CONTRACT & YEAR: F22. It's not necessary the use of ^ and $
+"B3_TIMESNSALES_REMOTE_FOLDER": "1ilmPPSUJt9ysgWtEZcnP18TJEUZFMGGt",
+"B3_TIMESNSALES_ROLL_ASSET_LIST": "DOL,DR1; WDO,WD1; IND,IR1; WIN,WI1; DAX,DX1; ESX,ES1; INK,NK1; ISP,RSP; WSP,WS1; VALEO,VALER; B3SAO,B3SAR; CCROO,CCROR; CIELO,CIELR; CMIGP,CMIGS; HYPEO,HYPER; COGNO,COGNR; PCARO,PCARR; PETRP,PETRS; PSSAO,PSSAR; USIMA,USIML; VIIAO,VIIAR; BGI,BR1; CCM,MR1; ETH,ET1; ICF,CR1; SJC,SC1; SOY,SO1", //Pattern: ASSET1, ROLL_ASSET1; ASSET2, ROLL_ASSET2; ... All non character and non digit is removed from pattern
+"B3_TIMESNSALES_SUMMARIZE_ASSETS_IGNORE": "TF\\d\\d\\d",    //Pattern: Blank or ASSET1_REGEX[@], ASSET2_REGEX, ...  @ => CONTRACT & YEAR: F22. It's not necessary the use of ^ and $
+"B3_TIMESNSALES_SUMMARIZE_ASSETS_XRAYED": "FRP0,FRP1,DOL@,WDO@,IND@,WIN@,DAX@,ESX@,INK@,ISP@,WSP@,VALEO@,B3SAO@,CCROO@,CIELO@,CMIGP@,HYPEO@,COGNO@,PCARO@,PETRP@,PSSAO@,USIMA@,VIIAO@,BGI@,CCM@,ETH@,ICF@,SJC@,SOY@",  //Pattern: Blank or ASSET1_REGEX[@], ASSET2_REGEX, ...  @ => CONTRACT & YEAR: F22. It's not necessary the use of ^ and $
+"B3_TIMESNSALES_SUMMARIZE_MINUTES_FRAME": "1", // Unit time: minutes
+"B3_TIMESNSALES_SUMMARIZE_POC_AVG_FRAME": "5",
+"B3_TIMESNSALES_ZIPFILENAME": "TS_FULL_$YYYYMMDD.zip",
+"B3_ASSETS_EXPIRY_FILE_SEPARATOR": ";", // Character separator for B3 Assets Expiry File
+"B3_ASSETS_EXPIRY_FILE_DOWNLOAD_TIMEOUT": "5", // 15 (fixed value) + quantity of seconds to assets expiry file for download timing out
+"B3_ASSETS_EXPIRY_ZIPFILENAME": "B3_ASSETS_EXPIRY_$DATE.zip", // Exported B3 Assets Expiry File with assets loaded in B3 TS file in a date
+"B3_ASSETS_EXPIRY_CLOUD_FOLDER": "1Mn-z_tO2awNAoAhxqyicM-6Mf8Riu3KY",
+
+// [CME procedures]
+"CME_QUERY_INTERVAL": "2",
+"CME_REQUEST_PAGESIZE": "5000",
+"CME_BLOCKTRADES_FILTER": "F,O,I",  //Pattern: 1-letter comma-delimited list: F-futures, O-options, I-? Example: F,O,I
+"CME_SUMMARY_ASSETS_FUTURES": "ALL",    //Pattern: Globex code comma-delimited list. Use ALL to retrive all known available globex codes. Example: 6L, ME, 6E
+"CME_SUMMARY_ASSETS_OPTIONS": "ALL",  //Pattern: Globex code comma-delimited list. Use ALL to retrive all known available globex codes. Example: 6L, ME, 6E
+"CME_CHARTLOAD_TIMEOUT": "15", //Chart loading timeout in seconds
+"CME_CHARTLOAD_QUERY_INTERVAL": "0", //Sleep interval in seconds before each chart query
+"CME_CHARTLOAD_CANDLE_MAX_REQUEST_DATA": "3600", // Maximum quantity of candles requested in a request for data message - MAXIMUM HARDCODED SET TO 3780
+"CME_ASSETS_EXPIRY_FILE_SEPARATOR": ",", // Character separator for CME Assets Expiry File
+"CME_ASSETS_EXPIRY_FILE_DOWNLOAD_TIMEOUT": "20", // 15 (fixed value) + quantity of seconds to assets expiry file for download timing out
+
+// [Backup procedure]
+"BACKUP_FILE_PREFIX": "BACKUP_",
+"BACKUP_TABLES_DELETE": "FALSE",    //Turns on/off DB clean process which runs after backup
+"BACKUP_TABLES_DELETE_KEEPDAYS": "cme-timesnsales;365, cme-blocktrades;365, loadcontrol;90",    //Pattern: A comma-separeted list with table-name;days to keep in DB. Any previous data is deleted. Example: cme-timesnsales;365, cme-blocktrades;365, loadcontrol;90
+"BACKUP_TABLES_DELETE_KEEPDAYS_MINIMUM": "90",  //Any non listed table in BACKUP_TABLES_DELETE_KEEPDAYS list will keep this minimum threshold. All previous data will be erased after backup.
+"BACKUP_LOG_FILES_CLEAN_DAYS": "5", // Unit time: days
+"BACKUP_DELIMITER": ";",    // Backup files delimiter
+"BACKUP_DB_CLOUD_FOLDER": "1vng9VyH3Kqv9i9F33VFqaL6ELOeWAnJH",
+"BACKUP_LOG_CLOUD_FOLDER": "1q04hcEBPrbqb2IISj4xlzQk1u00s7MA4",
+"BACKUP_CLOUD_FILES_RETENTION": "5", // Backup cloud files retention in days
+
+// [BOT]
+"TELEGRAM_TRACELOG_MIN_LOG_LEVEL": "silly", // silly, info, warn, error, fatal
+"TELEGRAM_TRACELOG_MESSAGE_CAPTION": "[TRACELOG]:",
+"TELEGRAM_SENDMESSAGE_RETRIES": "3",
+"TELEGRAM_SENDMESSAGE_RETRY_INTERVAL": "10", // Unit time: seconds
+"USER_TOKEN_MAX_EMAIL_TRIALS": "5",
+"USER_TOKEN_EXPIRING_HOURS": "24", // Unit time: hours
+"USER_BAN_HOURS": "48", // Unit time: hours
+"LIVELOAD_ALLOWED_IP": "189.59.176.69",
+"BOT_QUERY_MAXIMUM_DATES_RANGE": "260", // Unit time: trade days
+"BOT_QUERY_PTAX_MAX_PRIOR_DAYS": "5", // Unit time: days
+"BOT_QUERY_OI_HIGH_LOW_TO_SDEV_MULTIPLIER": "0.225",
+"BOT_EVENT_ECONOMIC_CALENDAR_CURRENCIES_LIST": "BRL, USD",
+"BOT_EVENT_ECONOMIC_CALENDAR_MINIMUM_IMPORTANCE": "2",
+"BOT_EVENT_ECONOMIC_CALENDAR_MAXIMUM_DELAY_MINUTES": "5"
+}

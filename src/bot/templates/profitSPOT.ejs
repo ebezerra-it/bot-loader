@@ -1,0 +1,53 @@
+{
+    SPOT backtest indicator
+    Author: t.me/edubbulhoes
+}
+input
+    Future(True);
+var 
+    dt: Array[0..<%= qte %>] of Integer;
+    fD2Spot: Array[0..<%= qte %>] of Float;
+    fD1Spot: Array[0..<%= qte %>] of Float;
+    fD0Spot: Array[0..<%= qte %>] of Float;
+
+    fD2Fut: Array[0..<%= qte %>] of Float;
+    fD1Fut: Array[0..<%= qte %>] of Float;
+    fD0Fut: Array[0..<%= qte %>] of Float;
+
+    qte, i: Integer;
+begin
+<% for(var i=0; i<qte; i++) { %>
+    dt[<%= i %>] := <%= spot[i].date %>;
+    fD2Spot[<%= i %>] := <%= spot[i].spot_d2 %>;
+    fD1Spot[<%= i %>] := <%= spot[i].spot_d1 %>;
+    fD0Spot[<%= i %>] := <%= spot[i].spot_d0 %>;
+
+    fD2Fut[<%= i %>] := <%= spot[i].fut_d2 %>;
+    fD1Fut[<%= i %>] := <%= spot[i].fut_d1 %>;
+    fD0Fut[<%= i %>] := <%= spot[i].fut_d0 %>;
+
+<% } %>
+    qte := <%= qte %>;
+
+    if (date >= dt[0]) then
+    begin
+        for i:=0 to qte do
+        begin
+            if (date = dt[i]) then
+            begin
+                if (Future) then
+                begin
+                    plot(fD2Fut[i]);
+                    plot2(fD1Fut[i]);
+                    plot3(fD0Fut[i]);
+                end
+                else
+                begin
+                    plot(fD2Spot[i]);
+                    plot2(fD1Spot[i]);
+                    plot3(fD0Spot[i]);
+                end;
+            end;
+        end;
+    end;   
+end;
