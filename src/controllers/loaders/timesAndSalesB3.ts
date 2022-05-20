@@ -72,7 +72,7 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
       zipFilename,
     );
 
-    if (!(await this.downloadFile(params.dateRef, url, zipPathFilename))) {
+    if (!(await this.downloadTSFile(params.dateRef, url, zipPathFilename))) {
       this.logger.error(
         `[${this.processName}] - DateRef: ${params.dateRef.toFormat(
           'dd/MM/yyyy',
@@ -137,7 +137,11 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
     return res;
   }
 
-  async performQuery(params: { action: string; url: string }): Promise<any> {
+  async performQuery(params: {
+    action: string;
+    url?: string;
+    filePath?: string;
+  }): Promise<any> {
     if (params.action === 'GET_T&S_DATES') {
       const url = 'https://arquivos.b3.com.br/apinegocios/dates';
       const tradeDates = (await axios({ url, method: 'GET' })).data;
@@ -149,31 +153,48 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
         DateTime.fromFormat(d, 'yyyy-MM-dd'),
       );
     }
-    if (params.action === 'GET_T&S_FILE') {
+    if (params.action === 'GET_T&S_B3') {
+      if (!params.url)
+        throw new Error(
+          `[${
+            this.processName
+          }] performQuery() - Missing parameters: ${JSON.stringify(params)}`,
+        );
+
       return axios({
         url: params.url,
         method: 'GET',
         responseType: 'stream',
       });
     }
+    if (params.action === 'GET_T&S_CLOUD') {
+      if (!params.filePath)
+        throw new Error(
+          `[${
+            this.processName
+          }] performQuery() - Missing parameters: ${JSON.stringify(params)}`,
+        );
+
+      const foundInCloud = await CloudFileManager.downloadFileCloud(
+        CloudFileManager.getTsGoogleDrive(),
+        params.filePath,
+        process.env.B3_TIMESNSALES_REMOTE_FOLDER || '',
+      );
+
+      return foundInCloud;
+    }
     throw new Error(`Missing action parameter: ${JSON.stringify(params)}`);
   }
 
-  public async downloadFile(
+  public async downloadTSFile(
     dateRef: DateTime,
     url: string,
     filePath: string,
   ): Promise<boolean> {
-    const remoteFolder =
-      process.env.B3_TIMESNSALES_REMOTE_FOLDER ||
-      process.env.BACKUP_DB_CLOUD_FOLDER ||
-      '';
-
-    const foundInCloud = await CloudFileManager.downloadFileCloud(
-      CloudFileManager.getTsGoogleDrive(),
+    const foundInCloud: boolean = await this.retry({
+      action: 'GET_T&S_CLOUD',
       filePath,
-      remoteFolder,
-    );
+    });
 
     if (foundInCloud) return new Promise(resolve => resolve(true));
 
@@ -196,7 +217,7 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
 
     let response;
     try {
-      response = await this.retry({ action: 'GET_T&S_FILE', url });
+      response = await this.retry({ action: 'GET_T&S_B3', url });
     } catch (err) {
       if (err.response && err.response.status === 404) {
         return false;

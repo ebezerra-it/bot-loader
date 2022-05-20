@@ -12,7 +12,7 @@ import { TExchange } from './controllers/tcountry';
 
 (async () => {
   await queryFactory.initialize(true);
-  await GlobalParameters.load(queryFactory);
+  await GlobalParameters.init(queryFactory, true);
   const logger = new Logger();
   const bot = new TelegramBot(
     process.env.TELEGRAM_BOT_TOKEN || '',
@@ -29,10 +29,11 @@ import { TExchange } from './controllers/tcountry';
   );
 
   const dates = [
-    DateTime.fromFormat('26/04/2022', 'dd/MM/yyyy'),
-    DateTime.fromFormat('27/04/2022', 'dd/MM/yyyy'),
-    DateTime.fromFormat('28/04/2022', 'dd/MM/yyyy'),
-    DateTime.fromFormat('29/04/2022', 'dd/MM/yyyy'),
+    DateTime.fromFormat('12/05/2022', 'dd/MM/yyyy'),
+    DateTime.fromFormat('13/05/2022', 'dd/MM/yyyy'),
+    DateTime.fromFormat('16/05/2022', 'dd/MM/yyyy'),
+    DateTime.fromFormat('17/05/2022', 'dd/MM/yyyy'),
+    DateTime.fromFormat('18/05/2022', 'dd/MM/yyyy'),
   ];
 
   // eslint-disable-next-line no-restricted-syntax
