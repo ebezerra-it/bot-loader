@@ -157,7 +157,20 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
             qToken[0].emailtrials <
             parseInt(process.env.USER_TOKEN_MAX_EMAIL_TRIALS || '1')
           ) {
-            await this.bot.sendUserTokenEmail(user, qToken[0].token);
+            const errToken = await this.bot.sendUserTokenEmail(
+              user,
+              qToken[0].token,
+            );
+            if (errToken) {
+              await this.bot.sendMessage(
+                user.chatId,
+                `${this.messages.MSG_TOKEN_ERROR} ${errToken.message}`,
+                {
+                  reply_to_message_id: msg.message_id,
+                },
+              );
+              return;
+            }
             const emailtrials = qToken[0].emailtrials + 1;
             await this.bot.queryFactory.runQuery(
               `UPDATE "users-tokens" SET "email-trials"=$3 WHERE "user-id"=$1 AND token=$2`,

@@ -25,7 +25,7 @@ class GlobalParameters extends ReportLoader {
       `[${
         this.processName
       }] - Process started - DateMatch: ${params.dateMatch.toFormat(
-        'dd/MM/yyyy HH:mm:ss',
+        'dd/MM/yyyy HH:mm:ssZ',
       )}`,
     );
 

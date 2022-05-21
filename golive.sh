@@ -1,14 +1,14 @@
-set -e
-if [ ! -z $1]; then
-    export APP_VERSION=$1
-else
+set -e     # Exit immediately if a command exits with a non-zero status
+
+if [ -z $1 ]; then
     export APP_VERSION=1.0
+else
+    export APP_VERSION=$1
 fi
 
-if [ ! -z $2]; then
+if [ -n $2 ]; then
     SERVICE=$2
 fi
-
 
 echo "[MYORACULUM-BOTLOADER] Generating build - App version $APP_VERSION"
 yarn build

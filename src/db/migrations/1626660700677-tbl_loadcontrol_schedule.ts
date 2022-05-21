@@ -20,6 +20,11 @@ export default class tblLoadcontrolSchedule1626660700677
             isNullable: false,
           },
           {
+            name: 'time-zone',
+            type: 'text',
+            isNullable: false,
+          },
+          {
             name: 'date-ref-adjust',
             type: 'int',
             isNullable: false,

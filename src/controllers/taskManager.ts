@@ -7,7 +7,7 @@ import { DateTime } from 'luxon';
 import { parseExpression } from 'cron-parser';
 import Task, { TLoadStatus } from './task';
 import { QueryFactory } from '../db/queryFactory';
-import { TExchange } from './tcountry';
+import { TExchange, TTimezone } from './tcountry';
 import ReportLoader from './reportLoader';
 import ReportLoaderCalendar from './reportLoaderCalendar';
 import GlobalParameters from './loaders/globalParameters';
@@ -19,7 +19,6 @@ import SummaryCME from './loaders/summaryCME';
 import PlayersB3 from './loaders/oiPlayersB3';
 import ContractsB3 from './loaders/oiContractsB3';
 import ExchangesCalendar from './loaders/exchangesCaladendar';
-// import BackupWorker from './loaders/backupWorker';
 import BackupRestoreDB from './loaders/backupRestoreDB';
 import TimesNSalesB3 from './loaders/timesAndSalesB3';
 import ChartLoaderCME from './loaders/chartLoaderCME';
@@ -29,6 +28,7 @@ import AssetsExpiryB3 from './loaders/assetsExpiryB3';
 interface ICronJob {
   name: string;
   cron: string;
+  timezone: string;
   dtRefAdj: number;
   reportLoader: ReportLoader | ReportLoaderCalendar;
   job: CronJob;
@@ -99,6 +99,7 @@ class TaskManager extends EventEmitter {
         this.queryfactory,
       ),
       cron: process.env.PROCESS_CRON || '*/5 * * * * *',
+      timezone: TTimezone.B3,
       dtRefAdj: 0,
     });
 
@@ -111,6 +112,7 @@ class TaskManager extends EventEmitter {
         TExchange.B3,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -123,6 +125,7 @@ class TaskManager extends EventEmitter {
         TExchange.B3,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -135,6 +138,7 @@ class TaskManager extends EventEmitter {
         TExchange.B3,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -147,6 +151,7 @@ class TaskManager extends EventEmitter {
         TExchange.B3,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -159,6 +164,7 @@ class TaskManager extends EventEmitter {
         TExchange.CME,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -171,6 +177,7 @@ class TaskManager extends EventEmitter {
         TExchange.B3,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -183,6 +190,7 @@ class TaskManager extends EventEmitter {
         TExchange.B3,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -195,6 +203,7 @@ class TaskManager extends EventEmitter {
         TExchange.B3,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -206,6 +215,7 @@ class TaskManager extends EventEmitter {
         this.queryfactory,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -218,6 +228,7 @@ class TaskManager extends EventEmitter {
         TExchange.B3,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -230,6 +241,7 @@ class TaskManager extends EventEmitter {
         TExchange.CME,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.CME,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -242,6 +254,7 @@ class TaskManager extends EventEmitter {
         TExchange.CME,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.CME,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
@@ -254,19 +267,22 @@ class TaskManager extends EventEmitter {
         TExchange.B3,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 
     for await (const schedule of schedules) {
       const qSchedule = await this.queryfactory.runQuery(
-        `INSERT INTO "loadcontrol-schedule" ("name", cron, "date-ref-adjust", 
-            "max-instances", active) VALUES ($1, $2, $3, $4, false) 
-            ON CONFLICT ("name") DO UPDATE SET active=false RETURNING 
-            "name", cron, "date-ref-adjust" as dtrefadj, 
-            "max-instances" as maxinstances, active`,
+        `INSERT INTO "loadcontrol-schedule" ("name", cron, "time-zone", 
+        "date-ref-adjust", "max-instances", active) 
+        VALUES ($1, $2, $3, $4, $5, false) 
+        ON CONFLICT ("name") DO UPDATE SET active=false RETURNING 
+        "name", cron, "time-zone" as timezone, "date-ref-adjust" as dtrefadj, 
+        "max-instances" as maxinstances, active`,
         {
           name: schedule.name,
           cron: schedule.cron,
+          timezone: schedule.timezone,
           dtRefAdj: schedule.dtRefAdj,
           maxInstances: parseInt(
             process.env.DEFAULT_SCHEDULE_MAXINSTANCES || '1',
@@ -281,13 +297,14 @@ class TaskManager extends EventEmitter {
         },
         null,
         false,
-        process.env.TZ || 'America/Sao_Paulo',
+        qSchedule[0].timezone || 'America/Sao_Paulo',
         this,
       );
 
       this.loaderjobs.push({
         name: qSchedule[0].name,
         cron: qSchedule[0].cron,
+        timezone: qSchedule[0].timezone,
         dtRefAdj: qSchedule[0].dtrefadj,
         reportLoader: schedule.class,
         job,
@@ -315,7 +332,7 @@ class TaskManager extends EventEmitter {
 
     const jobsStatus = this.loaderjobs.map(j => {
       return {
-        ts: DateTime.now(),
+        now: DateTime.now().toJSDate(),
         name: j.name,
         cron: j.cron,
         dtRefAdj: j.dtRefAdj,
@@ -335,8 +352,9 @@ class TaskManager extends EventEmitter {
 
   private async checkSchedules(): Promise<void> {
     const qSchedules = await this.queryfactory.runQuery(
-      `SELECT name, cron, "date-ref-adjust" as dtrefadj, active, 
-      "max-instances" as maxinstances FROM "loadcontrol-schedule" ORDER BY name`,
+      `SELECT name, cron, "time-zone" as timezone, 
+      "date-ref-adjust" as dtrefadj, active, "max-instances" as maxinstances 
+      FROM "loadcontrol-schedule" ORDER BY name`,
       {},
     );
 
@@ -351,9 +369,14 @@ class TaskManager extends EventEmitter {
         if (sch.maxinstances !== loaderjob.maxInstances)
           loaderjob.maxInstances = sch.maxinstances;
 
-        if (sch.cron !== loaderjob.cron) {
+        if (
+          sch.cron !== loaderjob.cron ||
+          sch.timezone !== loaderjob.timezone
+        ) {
           loaderjob.cron = sch.cron;
-          loaderjob.job.setTime(new CronTime(loaderjob.cron));
+          loaderjob.job.setTime(
+            new CronTime(loaderjob.cron, loaderjob.timezone),
+          );
           if (sch.active) loaderjob.job.start();
         }
 
@@ -374,7 +397,7 @@ class TaskManager extends EventEmitter {
           {
             process: loaderjob.name,
             status: TLoadStatus.STARTED,
-            now: DateTime.now().toJSDate(),
+            now: DateTime.now().setZone(loaderjob.timezone).toJSDate(),
             reprocessInterval: parseInt(
               process.env.REPROCESS_FINISHED_INTERVAL || '1800',
             ),
@@ -502,7 +525,7 @@ class TaskManager extends EventEmitter {
           dateRef: dateRef.toJSDate(),
           process: loaderjob!.name,
           status: TLoadStatus.STARTED,
-          startedAt: DateTime.now().toJSDate(),
+          startedAt: DateTime.now().setZone(dateMatch.zoneName).toJSDate(),
         },
       );
       this.logger.warn(

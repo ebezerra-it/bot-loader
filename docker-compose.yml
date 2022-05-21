@@ -16,9 +16,9 @@ services:
       - /bin/bash
       - -c
       - |
-        yarn dev:tsloader
+        yarn dev
 #        yarn dev:typeorm migration:run
-#        yarn dev
+#        yarn dev:tsloader
 #        yarn dev:cloudtransfer
 #        yarn dev:chartloader
 #        sleep infinity

@@ -21,7 +21,7 @@ class spotExchangeIntradayB3 extends ReportLoaderCalendar {
       `[${
         this.processName
       }] - Process started - DateRef: ${params.dateRef.toFormat(
-        'dd/MM/yyyy HH:mm:ss',
+        'dd/MM/yyyy HH:mm:ssZ',
       )}`,
     );
 

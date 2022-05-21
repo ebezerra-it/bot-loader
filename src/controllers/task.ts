@@ -51,7 +51,9 @@ class Task extends EventEmitter {
         dateRef: this.params.dateRef.toJSDate(),
         process: this.name,
         status: TLoadStatus.STARTED,
-        startedAt: DateTime.now().toJSDate(),
+        startedAt: DateTime.now()
+          .setZone(this.params.dateMatch.zoneName)
+          .toJSDate(),
       },
     );
 
@@ -85,7 +87,7 @@ class Task extends EventEmitter {
                   results,
                 )}`,
               );
-            } else if (this.name === 'BackupWorker') {
+            } else if (this.name === 'BackupRestoreDB') {
               if (
                 !(await this.reportLoader.allExchangesHoliday(
                   this.params.dateRef,
@@ -114,7 +116,9 @@ class Task extends EventEmitter {
             process: this.name,
             status: TLoadStatus.DONE,
             results,
-            endedAt: DateTime.now().toJSDate(),
+            endedAt: DateTime.now()
+              .setZone(this.params.dateMatch.zoneName)
+              .toJSDate(),
           });
 
           this.reportLoader.logger.info(

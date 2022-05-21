@@ -60,7 +60,7 @@ class PtaxBCB extends ReportLoaderCalendar {
         this.processName
       }] - Process started - DateRef: ${params.dateRef.toFormat(
         'dd/MM/yyyy',
-      )} - DateMatch: ${params.dateMatch.toFormat('dd/MM/yyyy HH:mm:ss')}`,
+      )} - DateMatch: ${params.dateMatch.toFormat('dd/MM/yyyy HH:mm:ssZ')}`,
     );
 
     return this.getBCBReportAssets(params.dateRef);

@@ -10,6 +10,13 @@ import { isNumber, loadJSONConfigFile } from '../utils';
 import { ILoadResult } from '../reportLoader';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
 
+/*
+https://www.cmegroup.com/market-data/daily-bulletin.html
+The previous trade date Daily Bulletin is as Preliminary report at ~9:00pm CT,
+and the Final report updates at ~10:00am CT next business day.
+
+Schedule for FINAL REPORT: 0 30 10 * * MON-FRI (America/Chicago)
+*/
 enum TReportType {
   PRELIMINARY = 'P',
   FINAL = 'F',
@@ -500,7 +507,7 @@ class SummaryCME extends ReportLoaderCalendar {
     dateRef: DateTime,
   ): Promise<TReportType | undefined> {
     const urlTradeDates =
-      'https://www.cmegroup.com/CmeWS/mvc/Volume/TradeDates?exchange=CBOT';
+      'https://www.cmegroup.com/CmeWS/mvc/Volume/TradeDates?exchange=CME';
     const resTradeDates = await this.retry({
       action: 'SUMMARY',
       url: urlTradeDates,

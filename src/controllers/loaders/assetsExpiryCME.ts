@@ -788,7 +788,7 @@ export default class AssetsExpiryCME extends ReportLoaderCalendar {
           __dirname,
           '../../../',
           'config/',
-          'CME_assets_load_config.json',
+          'cme_assets_load_config.json',
         ),
       );
 
@@ -812,13 +812,13 @@ export default class AssetsExpiryCME extends ReportLoaderCalendar {
 
       if (!filteredAssets || filteredAssets.length === 0)
         throw new Error(
-          `[${this.processName}] loadAssetsLoadConfig() - Identified error in file '/config/CME_assets_load_config.json': No asset was selected`,
+          `[${this.processName}] loadAssetsLoadConfig() - Identified error in file '/config/cme_assets_load_config.json': No asset was selected`,
         );
 
       return filteredAssets;
     } catch (e) {
       throw new Error(
-        `[${this.processName}] loadAssetsLoadConfig() - Identified error when parsing file '/config/CME_assets_load_config.json': ${e.message}`,
+        `[${this.processName}] loadAssetsLoadConfig() - Identified error when parsing file '/config/cme_assets_load_config.json': ${e.message}`,
       );
     }
   }

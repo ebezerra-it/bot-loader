@@ -33,6 +33,7 @@
     "MSG_TOKEN_MAX_SEND_TRIALS" : "Maximum token send trials reached. Contact your administrator.",
     "MSG_TOKEN_VALIDATED" : "User token validated successfully.",
     "MSG_TOKEN_SENT" : "User token sent to your e-mail address.",
+    "MSG_TOKEN_ERROR": "An error occourred when trying to send e-mail token:",
     "MSG_RETOREBKPDB_FILE_NOTFOUND": "Backup file not found in cloud",
     "MSG_RETOREBKPDB_TABLE_NOTFOUND": "Table not found. User 'ALL' for database restore",
     "MSG_RETOREBKPDB_SCHEDULE_NOTACTIVE": "Backup schedule is not active",

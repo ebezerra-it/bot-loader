@@ -1,3 +1,4 @@
+/* eslint-disable no-nested-ternary */
 /* eslint-disable no-loop-func */
 /* eslint-disable no-empty-pattern */
 /* eslint-disable no-useless-escape */
@@ -37,7 +38,7 @@ class ChartLoaderCME extends ReportLoaderCalendar {
       `[${
         this.processName
       }] - Process started - DateMatch: ${params.dateMatch.toFormat(
-        'dd/MM/yyyy HH:mm',
+        'dd/MM/yyyy HH:mmZ',
       )}`,
     );
 
@@ -124,11 +125,13 @@ class ChartLoaderCME extends ReportLoaderCalendar {
     for await (const contract of contracts) {
       if (!contract.exchangeCode) {
         this.logger.warn(
-          `[${this.processName}] Contract missing exchange code - Asset: ${
+          `[${
+            this.processName
+          }] Unindentified contract exchange code - Asset: ${
             asset.globexcode
           } - Contract: ${JSON.stringify(contract)}`,
         );
-        continue;
+        // continue; // keep it processing and the exchangecode is ignored in TradingView url
       }
 
       await this.sleep(Number(process.env.CME_CHARTLOAD_QUERY_INTERVAL || '5'));
@@ -196,7 +199,11 @@ class ChartLoaderCME extends ReportLoaderCalendar {
       }
 
       this.logger.silly(
-        `[${this.processName}] Asset ${asset.globexcode} - Contract ${contract.code} - Candles loaded: ${insertedContract}`,
+        `[${this.processName}] Asset ${asset.globexcode} - Contract ${
+          contract.code
+        } - Candles loaded: ${insertedContract} - DateTime From: ${tsLastLoad.toFormat(
+          'dd/MM/yyyy HH:mmZ',
+        )}`,
       );
     }
     return { inserted, deleted: 0 };
@@ -281,11 +288,14 @@ class ChartLoaderCME extends ReportLoaderCalendar {
               year: c.priceChart.year,
               volumeDay: Number(String(c.volume).replace(/,/g, '')),
               exchangeCode:
-                // eslint-disable-next-line no-nested-ternary
                 c.exchangeCode === 'XCME'
-                  ? 'CME'
+                  ? 'CME_GBX'
                   : c.exchangeCode === 'XNYM'
-                  ? 'NYMEX'
+                  ? 'NYMEX_GBX'
+                  : c.exchangeCode === 'XCBT'
+                  ? 'CBOT_GBX'
+                  : c.exchangeCode === 'XCEC'
+                  ? 'COMEX_GBX'
                   : undefined,
             });
           }
@@ -308,8 +318,19 @@ class ChartLoaderCME extends ReportLoaderCalendar {
       try {
         await params.page!.evaluate(() => window.stop());
       } catch (e) {}
-      const url = `https://s.tradingview.com/cmewidgetembed/?frameElementId=tradingview_fa45f&symbol=${params.contract.exchangeCode}%3A${params.asset.globexcode}${params.contract.letter}${params.contract.year}&interval=1&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=E4E8EB&studies=%5B%5D&style=0&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&venue=0&utm_source=www.cmegroup.com&utm_medium=widget&utm_campaign=chart&utm_term=${params.contract.exchangeCode}%3A${params.asset.globexcode}${params.contract.letter}${params.contract.year}`;
-      // const url = `https://www.cmegroup.com/apps/cmegroup/widgets/productLibs/esignal-charts.html?type=p&code=${params.asset.globexcode}&title=&venue=0&monthYear=${params.contract.code}&year=${params.contract.year}&exchangeCode=${params.contract.exchangeCode}&interval=1`;
+      const url = `https://s.tradingview.com/cmewidgetembed/?frameElementId=tradingview_fa45f&symbol=${
+        params.contract.exchangeCode
+          ? params.contract.exchangeCode.concat('%3A') // 'CME:6LM2022'
+          : ''
+      }${params.asset.globexcode}${params.contract.letter}${
+        params.contract.year
+      }&interval=1&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=E4E8EB&studies=%5B%5D&style=0&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&venue=0&utm_source=www.cmegroup.com&utm_medium=widget&utm_campaign=chart&utm_term=${
+        params.contract.exchangeCode
+          ? params.contract.exchangeCode.concat('%3A')
+          : ''
+      }${params.asset.globexcode}${params.contract.letter}${
+        params.contract.year
+      }`;
 
       await params.page.setUserAgent(
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36',

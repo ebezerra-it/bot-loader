@@ -236,17 +236,22 @@ class TelegramBot extends Telegram {
     }
   }
 
-  public async sendUserTokenEmail(user: IUser, token: string): Promise<void> {
+  public async sendUserTokenEmail(user: IUser, token: string): Promise<any> {
     const pathTemplatesDir = path.resolve(`${__dirname}/templates`);
     const html = await ejs.renderFile(`${pathTemplatesDir}/emailtoken.ejs`, {
       name: user.name,
       token,
     });
-    await this.sendEmail({
-      sendTo: user.email,
-      subject: EMAIL_TOKEN_SUBJECT,
-      html,
-    });
+    try {
+      await this.sendEmail({
+        sendTo: user.email,
+        subject: EMAIL_TOKEN_SUBJECT,
+        html,
+      });
+      return undefined;
+    } catch (e) {
+      return { code: e.code, message: e.message };
+    }
   }
 
   private async sendEmail(email: {
@@ -271,7 +276,7 @@ class TelegramBot extends Telegram {
           if (err) {
             reject(
               new Error(
-                `Google - Failed to create access token: ${err.message}`,
+                `Google - Failed to create access token: ${err.code}-${err.message}\nClient-ID: ${process.env.GOOGLE_CLIENT_ID}\nSecret-Key: ${process.env.GOOGLE_SECRET_KEY}\nRefresh-Token: ${process.env.GOOGLE_REFRESH_TOKEN}`,
               ),
             );
           }
@@ -302,7 +307,7 @@ class TelegramBot extends Telegram {
       await emailTransporter.sendMail(emailOptions);
     };
 
-    sendEmail({
+    await sendEmail({
       from: `"MyOraculum" ${process.env.GOOGLE_EMAIL}`,
       to: email.sendTo,
       subject: email.subject,
