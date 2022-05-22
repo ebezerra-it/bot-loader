@@ -35,12 +35,17 @@ export default class BotRoutes extends BaseRoutes {
     });
 
     router.post('/sendmsg', this.blockRemoteCall, async (req, res) => {
-      const { u, m } = req.body;
-
+      const { t, u, m } = req.body; // t - TUserType; u - userId; m - message
       try {
-        const { authType, user } = await this.bot.getUser({ id: u });
-        if (authType !== TUserReturnAuthType.AUTH || !user) return;
-        this.bot.sendMessage(user.chatId, m);
+        if ((!t && !u) || !m)
+          throw new Error(`Missing parameters: t=${t}, u=${u}, m=${m}`);
+        if (u) {
+          const { authType, user } = await this.bot.getUser({ id: u });
+          if (authType !== TUserReturnAuthType.AUTH || !user) return;
+          this.bot.sendMessage(user.chatId, m);
+        } else if (t) {
+          this.bot.sendMessageToUsers(t, m);
+        }
       } catch (error) {
         this.logger.error(
           `[BOT-API] BOT route /sendmsg exception: ${error.message}`,

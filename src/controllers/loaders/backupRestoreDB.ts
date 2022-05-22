@@ -7,6 +7,7 @@ import CloudFileManager from '../cloudFileManager';
 import { TCountryCode } from '../tcountry';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
 import ReportLoader, { ILoadResult } from '../reportLoader';
+import { TUserType } from '../../bot/telegramBot';
 
 export default class BackupRestoreDB extends ReportLoader {
   public async process(params: {
@@ -39,11 +40,28 @@ export default class BackupRestoreDB extends ReportLoader {
         cloud,
         pathFileName: backupPathFileName,
       });
+
+      process.env.RESTOREDB = 'TRUE'; // used to stop user bot control
+
+      await this.throwBotEvent('sendmsg', {
+        t: TUserType.DEFAULT,
+        m: `[Service OFFLINE] Database restore procedure in progress and service is OFFLINE. Please, wait...`,
+      });
+
+      await this.sleep(30);
+
       await BackupRestoreDB.restoreDataBase(
         backupPathFileName,
         params.restoreTable,
       );
-      fs.unlinkSync(backupPathFileName);
+      if (fs.existsSync(backupPathFileName)) fs.unlinkSync(backupPathFileName);
+
+      delete process.env.RESTOREDB;
+
+      await this.throwBotEvent('sendmsg', {
+        t: TUserType.DEFAULT,
+        m: `[Service ONLINE] Database restore procedure finished and service is now ONLINE!`,
+      });
 
       this.logger.warn(
         `[${this.processName}] Database restored: ${params.dateRef.toFormat(
@@ -60,7 +78,7 @@ export default class BackupRestoreDB extends ReportLoader {
       cloud,
       pathFileName: backupPathFileName,
     });
-    fs.unlinkSync(backupPathFileName);
+    if (fs.existsSync(backupPathFileName)) fs.unlinkSync(backupPathFileName);
     await this.cleanCloudBackupFiles(cloud, params.dateRef);
 
     const pathLogFileName = await this.compactLogFile(params.dateRef);
@@ -71,7 +89,7 @@ export default class BackupRestoreDB extends ReportLoader {
         cloud,
         pathFileName: pathLogFileName,
       });
-      fs.unlinkSync(pathLogFileName);
+      if (fs.existsSync(pathLogFileName)) fs.unlinkSync(pathLogFileName);
       await this.cleanLogFiles(params.dateRef);
     }
 

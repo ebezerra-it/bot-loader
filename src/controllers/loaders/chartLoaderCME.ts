@@ -146,27 +146,18 @@ class ChartLoaderCME extends ReportLoaderCalendar {
       let tsLastLoad: DateTime;
       if (!qLastTS || qLastTS.length === 0 || !qLastTS[0].lastts) {
         const now = DateTime.now().setZone(this.exchange.timezone);
-        if (now.hour >= 16 && now.hour <= 23) {
-          tsLastLoad = now.set({
-            hour: 16,
-            minute: 0,
-            second: 0,
-            millisecond: 0,
-          });
-        } else {
-          const lastTradeDate = await this.subTradeDays(
-            now,
-            1,
-            this.exchange.country.code,
-          );
+        const lastTradeDate = await this.subTradeDays(
+          now,
+          1,
+          this.exchange.country.code,
+        );
 
-          tsLastLoad = lastTradeDate.set({
-            hour: 16,
-            minute: 0,
-            second: 0,
-            millisecond: 0,
-          });
-        }
+        tsLastLoad = lastTradeDate.set({
+          hour: 16,
+          minute: 0,
+          second: 0,
+          millisecond: 0,
+        });
       } else {
         tsLastLoad = DateTime.fromJSDate(qLastTS[0].lastts, {
           zone: this.exchange.timezone,

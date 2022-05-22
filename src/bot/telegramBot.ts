@@ -139,7 +139,7 @@ class TelegramBot extends Telegram {
   public async sendMessageToUsers(
     userType: TUserType,
     message: string,
-    msgOptions: SendMessageOptions | undefined,
+    msgOptions?: SendMessageOptions | undefined,
     tracelog = false,
     header = '',
   ): Promise<void> {
@@ -330,7 +330,7 @@ class TelegramBot extends Telegram {
     queryFactory: QueryFactory,
   ): Promise<{ authType: TUserReturnAuthType; user: IUser | undefined }> {
     const { id, username } = params;
-    if (!username && !id)
+    if ((!username && !id) || process.env.RESTOREDB === 'TRUE')
       return { authType: TUserReturnAuthType.NOTREGITERED, user: undefined };
 
     let qUser;

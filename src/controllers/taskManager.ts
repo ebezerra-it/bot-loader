@@ -164,7 +164,7 @@ class TaskManager extends EventEmitter {
         TExchange.CME,
       ),
       cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
-      timezone: TTimezone.B3,
+      timezone: TTimezone.CME,
       dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
     });
 

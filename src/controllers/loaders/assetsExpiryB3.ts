@@ -94,26 +94,6 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
       }] - Process started - DateRef: ${params.dateRef.toFormat('dd/MM/yyyy')}`,
     );
 
-    if (!downloadOnly) {
-      const qLoadControl = await this.queryFactory.runQuery(
-        `SELECT DISTINCT process FROM "loadcontrol"
-      WHERE "date-ref"=$1 AND UPPER(process)=ANY($2) AND status='DONE'`,
-        {
-          dtRef: params.dateRef.toJSDate(),
-          process: ['TimesNSalesB3', 'SummaryB3', 'ContractsB3'].map(p =>
-            p.toUpperCase(),
-          ),
-        },
-      );
-
-      if (!qLoadControl || qLoadControl.length !== 3) {
-        this.logger.warn(
-          `[${this.processName}] Task finished empty to wait for pending processes to finish.`,
-        );
-        return { inserted: 0, deleted: 0 };
-      }
-    }
-
     let foundInCloud = true;
     let csvPathFileName = await this.getAssetsExpiryFileCloud(params.dateRef);
     if (!csvPathFileName) {
@@ -121,14 +101,16 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
       csvPathFileName = await this.getAssetsExpiryFileB3(params.dateRef);
     } else if (downloadOnly) return { inserted: -1, deleted: 0 };
 
-    if (!csvPathFileName)
-      throw new Error(
+    if (!csvPathFileName) {
+      this.logger.warn(
         `[${
           this.processName
         }] Assets expiry file unavailable for date: ${params.dateRef.toFormat(
           'dd/MM/yyyy',
         )} `,
       );
+      return { inserted: 0, deleted: 0 };
+    }
 
     // Certify b3-assets-expiry table is empty
     await this.queryFactory.runQuery(`TRUNCATE TABLE "b3-assets-expiry"`, {});
@@ -191,10 +173,28 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
 
     if (downloadOnly && !foundInCloud) return res!;
 
+    const qLoadControl = await this.queryFactory.runQuery(
+      `SELECT DISTINCT process FROM "loadcontrol"
+    WHERE "date-ref"=$1 AND UPPER(process)=ANY($2) AND status='DONE'`,
+      {
+        dtRef: params.dateRef.toJSDate(),
+        process: ['TimesNSalesB3', 'SummaryB3', 'ContractsB3'].map(p =>
+          p.toUpperCase(),
+        ),
+      },
+    );
+
+    if (!qLoadControl || qLoadControl.length !== 3) {
+      this.logger.warn(
+        `[${this.processName}] Task finished empty to wait for pending processes to finish.`,
+      );
+      return { inserted: 0, deleted: 0 };
+    }
+
     res = await this.updateAssetsExpiryTables(params.dateRef);
 
-    /* await this.queryFactory.runQuery(`TRUNCATE TABLE "b3-assets-expiry"`, {});
-    await this.queryFactory.runQuery(`VACUUM(FULL) "b3-assets-expiry"`, {}); */
+    await this.queryFactory.runQuery(`TRUNCATE TABLE "b3-assets-expiry"`, {});
+    await this.queryFactory.runQuery(`VACUUM(FULL) "b3-assets-expiry"`, {});
 
     return res;
   }
