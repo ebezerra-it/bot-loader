@@ -14,6 +14,7 @@ import { ILoadResult } from '../reportLoader';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
 import ZipFileManager from '../zipFileManager';
 import CloudFileManager from '../cloudFileManager';
+import { TDataOrigin } from '../../db/migrations/1634260181468-tbl_b3_ts_summary';
 
 interface ITimesAndSales {
   timestamp: DateTime;
@@ -53,9 +54,9 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
         DateTime.now().plus({ days: Number(qSch[0].dtadj) }),
         'day',
       )
-        ? 1
-        : 2;
-    else origin = 2;
+        ? TDataOrigin.B3_LOADER_PROCESS
+        : TDataOrigin.B3_LOADER_REPROCESS;
+    else origin = TDataOrigin.B3_LOADER_REPROCESS;
 
     const url = `http://arquivos.b3.com.br/apinegocios/tickercsv/${params.dateRef.toFormat(
       'yyyy-MM-dd',
@@ -505,7 +506,7 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
   ): Promise<ILoadResult> {
     let inserted = 0;
     const [, deleted] = await this.queryFactory.runQuery(
-      `DELETE FROM "b3-ts-summary" WHERE "timestamp-open"::DATE=$1::DATE AND origin<>3`,
+      `DELETE FROM "b3-ts-summary" WHERE "timestamp-open"::DATE=$1::DATE AND origin<>${TDataOrigin.PROFIT_LOADER}`,
       {
         date: dateRef.toJSDate(),
       },

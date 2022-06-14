@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { Logger } from 'tslog';
 import path from 'path';
 import { DateTime } from 'luxon';
+import fs from 'fs';
 dotenv.config();
 import TelegramBot, { TUserType } from './bot/telegramBot';
 import queryFactory from './db/queryFactory';
@@ -22,15 +23,15 @@ import CloudFileManager from './controllers/cloudFileManager';
     logger,
   );
   const cloud = new CloudFileManager();
-  const newCloud = new CloudFileManager(true);
+  const oldCloud = new CloudFileManager(true);
 
   logger.info(`CloudTransfer started: ${new Date()}`);
 
-  const query = cloud.gdrive
+  const query = oldCloud.gdrive
     .query()
     .setFileOnly()
     .setOrderBy('name')
-    .inFolder(process.env.B3_TIMESNSALES_REMOTE_FOLDER || '')
+    .inFolder(process.env.B3_TIMESNSALES_REMOTE_FOLDER_OLD || '')
     .setPageSize(300);
 
   let count = 0;
@@ -39,10 +40,13 @@ import CloudFileManager from './controllers/cloudFileManager';
 
     for await (const file of files) {
       const filenameMatch = file.name.match(/TS_FULL_(\d\d\d\d\d\d\d\d).zip/);
-      if (!filenameMatch) continue;
       if (
-        DateTime.fromFormat(filenameMatch[1], 'yyyyMMdd') <=
-        DateTime.fromFormat('20220207', 'yyyyMMdd')
+        !filenameMatch ||
+        !DateTime.fromFormat(filenameMatch[1], 'yyyyMMdd').isValid ||
+        DateTime.fromFormat(filenameMatch[1], 'yyyyMMdd').toMillis() >=
+          DateTime.fromFormat('20220512', 'yyyyMMdd').toMillis() ||
+        DateTime.fromFormat(filenameMatch[1], 'yyyyMMdd').toMillis() <=
+          DateTime.fromFormat('20211129', 'yyyyMMdd').toMillis()
       )
         continue;
 
@@ -53,22 +57,22 @@ import CloudFileManager from './controllers/cloudFileManager';
         file.name,
       );
       if (
-        await cloud.downloadFileCloud(
+        await oldCloud.downloadFileCloud(
           pathFile,
-          process.env.B3_TIMESNSALES_REMOTE_FOLDER || '',
+          process.env.B3_TIMESNSALES_REMOTE_FOLDER_OLD || '',
         )
       ) {
-        await newCloud.uploadFileCloud(
+        await cloud.uploadFileCloud(
           pathFile,
-          process.env.B3_TIMESNSALES_REMOTE_FOLDER_NEW || '',
+          process.env.B3_TIMESNSALES_REMOTE_FOLDER || '',
           false,
           false,
         );
-        // fs.unlinkSync(pathFile);
+        fs.unlinkSync(pathFile);
         logger.info(
           `${++count}/${files.length} - File ${path.basename(
             pathFile,
-          )} uploaded to new cloud`,
+          )} uploaded to the new cloud`,
         );
       }
     }

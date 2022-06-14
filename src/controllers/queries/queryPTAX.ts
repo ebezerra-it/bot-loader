@@ -129,32 +129,28 @@ export default class QueryPTAX extends Query {
 
       if (!aFRP0) {
         // consider frp0 d0 = frp1 d-1 if exists. Otherwise, frp0 d-1
+        // d0 volume estimated by previous 3 days avarage, excluding daily volume of 30k or above
         qFRP0 = await this.queryFactory.runQuery(
-          `SELECT q0.date date, COALESCE(q0.pmo, 0) frp0, COALESCE(q1.pmo, 0) frp1 FROM 
-          (SELECT "timestamp-open"::DATE date, MAX(high) h, MIN(low) l, (MAX(high) + MIN(low))/2 pmo, SUM(volume) as volume FROM "b3-ts-summary" bts WHERE asset = 'FRP0' AND "timestamp-open"::DATE<$1::DATE GROUP BY "timestamp-open"::DATE order by "timestamp-open"::DATE desc limit ${priorDays}) q0
-          LEFT JOIN
-          (SELECT "timestamp-open"::DATE date, MAX(high) h, MIN(low) l, (MAX(high) + MIN(low))/2 pmo FROM "b3-ts-summary" bts WHERE asset = 'FRP1' AND "timestamp-open"::DATE<$1::DATE GROUP BY "timestamp-open"::DATE order by "timestamp-open"::DATE desc limit ${priorDays}) q1
-          ON (q0.date = q1.date) ORDER BY date DESC`,
+          `SELECT date, COALESCE(pmo, 0) frp0, COALESCE(volume, 0) volume FROM 
+            (SELECT "timestamp-open"::DATE date, (MAX(high) + MIN(low))/2 pmo, SUM(volume) as volume FROM "b3-ts-summary" WHERE asset = 'FRP0' AND "timestamp-open"::DATE<$1::DATE GROUP BY "timestamp-open"::DATE ORDER BY "timestamp-open"::DATE DESC LIMIT ${priorDays}) q0
+            UNION 
+            SELECT q1.date, q1.pmo, avg(q2.volume) volume FROM 
+            (SELECT $1::DATE date, MAX(high) h, MIN(low) l, (MAX(high) + MIN(low))/2 pmo FROM "b3-ts-summary" WHERE asset = 'FRP1' AND "timestamp-open"::DATE<$1::DATE GROUP BY "timestamp-open"::DATE ORDER BY "timestamp-open"::DATE DESC LIMIT 1) q1,
+            (SELECT "timestamp-open"::DATE, SUM(volume) volume FROM "b3-ts-summary" WHERE asset = 'FRP0' AND "timestamp-open"::DATE<$1::DATE group by "timestamp-open"::DATE having sum(volume) < 30000 order by "timestamp-open"::DATE DESC LIMIT 3) 
+            q2
+            group by date, pmo
+            ORDER BY date DESC`,
           { date: dateRef.toJSDate() },
         );
 
-        if (qFRP0 && qFRP0.length === priorDays) {
-          aFRP0 = [];
-          aFRP0.push({
-            date: dateRef,
-            frp0:
-              Number(qFRP0[0].frp1) > 0
-                ? +Number(qFRP0[0].frp1).toFixed(2)
-                : Number(qFRP0[0].frp0),
-            volume: Number(qFRP0[0].volume),
+        if (qFRP0 && qFRP0.length === priorDays + 1) {
+          aFRP0 = qFRP0.map(q => {
+            return {
+              date: DateTime.fromJSDate(q.date),
+              frp0: +Number(q.frp0).toFixed(2),
+              volume: Number(q.volume),
+            };
           });
-          for (let i = 0; i < qFRP0.length; i++) {
-            aFRP0.push({
-              date: DateTime.fromJSDate(qFRP0[i].date),
-              frp0: +Number(qFRP0[i].frp0).toFixed(2),
-              volume: Number(qFRP0[i].volume),
-            });
-          }
         }
       }
     } else {
@@ -240,27 +236,27 @@ export default class QueryPTAX extends Query {
   }
 
   public static mergePTAX(dateRef: DateTime, ptax: IDatePTAX[]): IMergedPTAX {
-    // let sumFut = 0.0;
+    let sumFut = 0.0;
     let sumSpot = 0.0;
-    // let pvFut = 0.0;
+    let pvFut = 0.0;
     let pvSpot = 0.0;
     let sumVol = 0.0;
-    let sumFRP0 = 0.0;
+    // let sumFRP0 = 0.0;
 
     ptax.forEach(p => {
-      // pvFut += p.ptax_future * p.volume;
+      pvFut += p.ptax_future * p.volume;
       pvSpot += p.ptax_spot * p.volume;
-      // sumFut += p.ptax_future;
+      sumFut += p.ptax_future;
       sumSpot += p.ptax_spot;
       sumVol += p.volume;
-      sumFRP0 += p.frp0;
+      // sumFRP0 += p.frp0;
     });
 
     const res: IMergedPTAX = {
       date: dateRef,
-      ptax_future_avg: +Number(sumSpot / ptax.length + sumFRP0).toFixed(2),
+      ptax_future_avg: +Number(sumFut / ptax.length).toFixed(2),
       ptax_spot_avg: +Number(sumSpot / ptax.length).toFixed(2),
-      ptax_future_vwap: +Number(pvSpot / sumVol + sumFRP0).toFixed(2),
+      ptax_future_vwap: +Number(pvFut / sumVol).toFixed(2),
       ptax_spot_vwap: +Number(pvSpot / sumVol).toFixed(2),
       volume: sumVol,
     };

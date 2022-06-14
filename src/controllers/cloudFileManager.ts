@@ -6,9 +6,9 @@ import fs from 'fs';
 export default class CloudFileManager {
   public gdrive: TsGoogleDrive;
 
-  constructor(newCloud = false) {
-    this.gdrive = newCloud
-      ? CloudFileManager.getNewTsGoogleDrive()
+  constructor(oldCloud = false) {
+    this.gdrive = oldCloud
+      ? CloudFileManager.getOldTsGoogleDrive()
       : CloudFileManager.getTsGoogleDrive();
   }
 
@@ -24,11 +24,11 @@ export default class CloudFileManager {
     });
   }
 
-  public static getNewTsGoogleDrive(): TsGoogleDrive {
+  public static getOldTsGoogleDrive(): TsGoogleDrive {
     return new TsGoogleDrive({
       credentials: {
-        client_email: process.env.NEW_GDRIVE_CLIENT_EMAIL,
-        private_key: String(process.env.NEW_GDRIVE_PRIVATE_KEY).replace(
+        client_email: process.env.OLD_GDRIVE_CLIENT_EMAIL,
+        private_key: String(process.env.OLD_GDRIVE_PRIVATE_KEY).replace(
           /\\n/g,
           '\n',
         ),

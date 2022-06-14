@@ -16,6 +16,7 @@
 "QUERY_RETRY_EXPONENTIAL_MAX": "3600", // Unit time: seconds
 "REPROCESS_FINISHED_INTERVAL": "3600", // Unit time: seconds
 "CALENDAR_INVESTINGCOM_TIMEZONE": "12", // Investing.com calendar code - America/Sao_Paulo
+"CALENDAR_HOLIDAY_EXCEPTIONS": "[{ \"country\": \"BR\", \"exceptions\": [\"Ash Wednesday\", \"Quarta-feira de cinzas\"] }]", // Holidays 
 
 // [B3 and BCB procedures]
 "BCB_PTAX_CURRENCIES": "USD",   //Pattern: 3-letters currency code comma-delimited list. Use ALL to retrieve all known available currencies. Example: USD,GBP,MXN
@@ -46,7 +47,14 @@
 "CME_ASSETS_EXPIRY_FILE_SEPARATOR": ",", // Character separator for CME Assets Expiry File
 "CME_ASSETS_EXPIRY_FILE_DOWNLOAD_TIMEOUT": "20", // 15 (fixed value) + quantity of seconds to assets expiry file for download timing out
 
+// [TRADINGVIEW procedures]
+"TRADINGVIEW_CHARTLOAD_TIMEOUT": "15",
+"TRADINGVIEW_CHARTLOAD_QUERY_INTERVAL": "0",
+"TRADINGVIEW_CHARTLOAD_CANDLE_MAX_REQUEST_DATA": "3600",
+
 // [Backup procedure]
+"BACKUP_WAIT_FOR_DEPENDECY_LIST": "TRUE",
+"BACKUP_PROCESS_DEPENDECY_LIST": "AssetsExpiryB3, ContractsB3, PlayersB3, PTaxBCB, SpotExchangeB3, SummaryB3, TimesnSalesB3, AssetsExpiryCME, ChartLoaderCME, SummaryCME",
 "BACKUP_FILE_PREFIX": "BACKUP_",
 "BACKUP_TABLES_DELETE": "FALSE",    //Turns on/off DB clean process which runs after backup
 "BACKUP_TABLES_DELETE_KEEPDAYS": "cme-timesnsales;365, cme-blocktrades;365, loadcontrol;90",    //Pattern: A comma-separeted list with table-name;days to keep in DB. Any previous data is deleted. Example: cme-timesnsales;365, cme-blocktrades;365, loadcontrol;90
@@ -58,7 +66,7 @@
 "BACKUP_CLOUD_FILES_RETENTION": "5", // Backup cloud files retention in days
 
 // [BOT]
-"TELEGRAM_TRACELOG_MIN_LOG_LEVEL": "silly", // silly, info, warn, error, fatal
+"TELEGRAM_TRACELOG_MIN_LOG_LEVEL": "info", // info, warn, error, fatal
 "TELEGRAM_TRACELOG_MESSAGE_CAPTION": "[TRACELOG]:",
 "TELEGRAM_SENDMESSAGE_RETRIES": "3",
 "TELEGRAM_SENDMESSAGE_RETRY_INTERVAL": "10", // Unit time: seconds
@@ -71,5 +79,8 @@
 "BOT_QUERY_OI_HIGH_LOW_TO_SDEV_MULTIPLIER": "0.225",
 "BOT_EVENT_ECONOMIC_CALENDAR_CURRENCIES_LIST": "BRL, USD",
 "BOT_EVENT_ECONOMIC_CALENDAR_MINIMUM_IMPORTANCE": "2",
-"BOT_EVENT_ECONOMIC_CALENDAR_MAXIMUM_DELAY_MINUTES": "5"
+"BOT_EVENT_ECONOMIC_CALENDAR_MAXIMUM_DELAY_MINUTES": "5",
+
+//[CLOUD TRANSFER]
+"B3_TIMESNSALES_REMOTE_FOLDER_OLD": "1Equqi7gUtomsOHwvT-L7JQJkKRvdgSYh"
 }

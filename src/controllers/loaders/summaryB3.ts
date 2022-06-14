@@ -1,3 +1,4 @@
+/* eslint-disable no-nested-ternary */
 /* eslint-disable no-param-reassign */
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable no-useless-return */
@@ -713,8 +714,7 @@ class StatisticSummaryB3 extends ReportLoaderCalendar {
                   settle:
                     dc.find(
                       (col: { column: string; index: number }) =>
-                        col.column === 'AJUSTE' ||
-                        col.column === 'AJUSTEDE REF',
+                        col.column === 'AJUSTE',
                     )!.index >= 0
                       ? myParseFloat(
                           tds[
@@ -722,6 +722,19 @@ class StatisticSummaryB3 extends ReportLoaderCalendar {
                               dc.find(
                                 (col: { column: string; index: number }) =>
                                   col.column === 'AJUSTE',
+                              )!.index
+                          ].textContent!,
+                        )
+                      : dc.find(
+                          (col: { column: string; index: number }) =>
+                            col.column === 'AJUSTEDE REF',
+                        )!.index >= 0
+                      ? myParseFloat(
+                          tds[
+                            j +
+                              dc.find(
+                                (col: { column: string; index: number }) =>
+                                  col.column === 'AJUSTEDE REF',
                               )!.index
                           ].textContent!,
                         )

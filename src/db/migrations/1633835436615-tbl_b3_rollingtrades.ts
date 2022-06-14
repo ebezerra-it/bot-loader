@@ -1,4 +1,5 @@
 import { MigrationInterface, QueryRunner, Table, TableIndex } from 'typeorm';
+import { TDataOrigin } from './1634260181468-tbl_b3_ts_summary';
 
 export default class tblB3Rollingtrades1633835436615
   implements MigrationInterface
@@ -50,7 +51,7 @@ export default class tblB3Rollingtrades1633835436615
             isNullable: false,
           },
           {
-            name: 'origin', // 1-B3 LOADER PROCESS; 2-B3 LOADER REPROCESS; 3-PROFIT LOADER
+            name: 'origin', // TDataOrigin: 1-B3 LOADER PROCESS; 2-B3 LOADER REPROCESS; 3-PROFIT LOADER
             type: 'smallint',
             isNullable: true,
           },
@@ -75,3 +76,5 @@ export default class tblB3Rollingtrades1633835436615
     await queryRunner.dropTable('b3-rollingtrades');
   }
 }
+
+export { TDataOrigin };

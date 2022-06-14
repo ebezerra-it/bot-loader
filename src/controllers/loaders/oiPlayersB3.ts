@@ -48,7 +48,10 @@ interface IOIPlayers {
 class OIPlayersB3 extends ReportLoaderCalendar {
   assets: IAsset[];
 
-  async process(params: { dateRef: DateTime }): Promise<ILoadResult> {
+  async process(params: {
+    dateRef: DateTime;
+    dateMatch: DateTime;
+  }): Promise<ILoadResult> {
     this.logger.info(
       `[${
         this.processName
@@ -67,7 +70,9 @@ class OIPlayersB3 extends ReportLoaderCalendar {
       throw new Error(`Empty assets file: ${assetsFilePath}`);
     }
 
-    await this.getSpotReport();
+    if (params.dateMatch.startOf('day') === DateTime.now())
+      await this.getSpotReport();
+
     return this.getB3Report(params.dateRef);
   }
 

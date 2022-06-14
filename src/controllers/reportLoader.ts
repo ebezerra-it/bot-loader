@@ -1,3 +1,4 @@
+/* eslint-disable no-empty */
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { Logger } from 'tslog';
@@ -10,6 +11,11 @@ async function sleep(seconds: number): Promise<void> {
   if (seconds > 0) {
     await new Promise(r => setTimeout(r, 1000 * seconds));
   }
+}
+
+interface IHolidayExceptions {
+  country: TCountryCode;
+  exceptions: string[];
 }
 
 interface ILoadResult {
@@ -81,6 +87,44 @@ abstract class ReportLoader {
     return result;
   }
 
+  async sendBotMsgToUsers(params: {
+    userId?: any;
+    userType?: any;
+    message: any;
+  }): Promise<boolean> {
+    try {
+      const res = await this.retry(
+        {
+          url: `http://localhost:${
+            process.env.TELEGRAM_API_PORT || '8001'
+          }/sendmsg`,
+          postData: {
+            u: params.userId,
+            t: params.userType,
+            m: params.message,
+          },
+        },
+        true,
+      );
+
+      if (res.status !== 200)
+        throw new Error(
+          `[${this.processName}] - sendBotMsgToUsers() Message: ${
+            res.msg
+          } - Params: ${JSON.stringify(params)} - Status: ${res.status} ${
+            res.statusText
+          }`,
+        );
+    } catch (err) {
+      this.logger.error(
+        `[${this.processName}] - sendBotMsgToUsers() - Params: ${JSON.stringify(
+          params,
+        )} - Error: ${err.message}`,
+      );
+    }
+    return true;
+  }
+
   async throwBotEvent(event: string, params: any): Promise<boolean> {
     try {
       const res = await this.retry(
@@ -119,21 +163,19 @@ abstract class ReportLoader {
     });
   }
 
-  /* async loadJSONFile(pathFileName: string): Promise<any | undefined> {
-    return ReportLoader.loadJSONFile(pathFileName);
-  }
-
-  public static async loadJSONFile(
-    pathFileName: string,
-  ): Promise<any | undefined> {
-    return JSON.parse(fs.readFileSync(pathFileName, 'utf-8'));
-  } */
-
   public static async isHoliday(
     queryfactory: QueryFactory,
     date: DateTime,
     countryCode: TCountryCode,
   ): Promise<boolean> {
+    let holidayExceptions: IHolidayExceptions[];
+    try {
+      holidayExceptions = <IHolidayExceptions[]>(
+        JSON.parse(process.env.CALENDAR_HOLIDAY_EXCEPTIONS || '')
+      );
+    } catch (err) {
+      holidayExceptions = [];
+    }
     const qCalendar = await queryfactory.runQuery(
       `SELECT event from "holiday-calendar" WHERE "country-code"=$1 AND date=$2`,
       {
@@ -142,7 +184,27 @@ abstract class ReportLoader {
       },
     );
 
-    return !!(qCalendar && qCalendar.length > 0);
+    if (!qCalendar || qCalendar.length === 0) return false;
+
+    if (!holidayExceptions || holidayExceptions.length === 0) return true;
+
+    const holidayExceptionsCountry = holidayExceptions.find(
+      (h: IHolidayExceptions) => h.country === countryCode,
+    );
+
+    if (
+      !holidayExceptionsCountry ||
+      holidayExceptionsCountry.exceptions.length === 0
+    )
+      return true;
+
+    return qCalendar.find((q: any) =>
+      holidayExceptionsCountry.exceptions.find(
+        he =>
+          String(he).trim().toUpperCase() ===
+          String(q.event).trim().toUpperCase(),
+      ),
+    );
   }
 
   public async allExchangesHoliday(dateRef: DateTime): Promise<boolean> {

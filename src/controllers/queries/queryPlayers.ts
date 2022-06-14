@@ -35,19 +35,29 @@ interface IPosPlayersBalance {
 class QueryPlayers extends Query {
   public async process(params: {
     assets: IAssetWeight[];
-    dateFrom: DateTime;
+    dateFrom: DateTime | undefined;
     dateTo: DateTime;
     chatId?: number;
     messageId?: number;
   }): Promise<boolean> {
-    const resPlayers = await this.getPlayersBalance(
-      params.dateFrom,
-      params.assets,
-    );
+    let resPlayers;
+    let msgHeader;
+    if (params.dateFrom) {
+      resPlayers = await this.getPlayersBalDates(
+        params.dateFrom,
+        params.dateTo,
+        params.assets,
+      );
+      msgHeader = `Players Balance - Date-1: ${params.dateFrom.toFormat(
+        'dd/MM/yyyy',
+      )} / Date-2: ${params.dateTo.toFormat('dd/MM/yyyy')}\n`;
+    } else {
+      resPlayers = await this.getPlayersBalance(params.dateTo, params.assets);
+      msgHeader = `Players Balance - Date: ${params.dateTo.toFormat(
+        'dd/MM/yyyy',
+      )}\n`;
+    }
 
-    const msgHeader = `Players Balance - Date: ${params.dateFrom.toFormat(
-      'dd/MM/yyyy',
-    )}\n`;
     let botResponse;
 
     if (resPlayers) botResponse = TelegramBot.printJSON(resPlayers);
@@ -81,7 +91,7 @@ class QueryPlayers extends Query {
 
     const aSQL: string[] = [];
     assets.forEach(a => {
-      aSQL.push(`(SELECT date::DATE as date, asset, 
+      aSQL.push(`(SELECT date::DATE as date, "asset-code" asset, 
         ${a.weight}::NUMERIC as weight, 1 as qtty, 
         "for_inv_res2689_buy" as foreignbuy, 
         "for_inv_res2689_sell" as foreignsell, 
@@ -89,8 +99,8 @@ class QueryPlayers extends Query {
         "inst_inv_national_investor_sell" as nationalsell, 
         "fin_corp_banks_buy" as bankbuy, 
         "fin_corp_banks_sell" as banksell
-        FROM "b3-openposplayers" 
-        WHERE asset = '${a.asset}' and "asset-type"='FUTURES' AND date::DATE<=$1 
+        FROM "b3-oi-players" 
+        WHERE "asset-code" = '${a.asset}' and "asset-type"='FUTURES' AND date::DATE<=$1 
         ORDER BY date DESC 
         LIMIT 2)`);
     });
@@ -141,6 +151,92 @@ class QueryPlayers extends Query {
       posPlayers: aPlayers,
       balance: {
         date: dateRef,
+        foreignBal: +Number(
+          aPlayers[0].foreignBal - aPlayers[1].foreignBal,
+        ).toFixed(2),
+        nationalBal: +Number(
+          aPlayers[0].nationalBal - aPlayers[1].nationalBal,
+        ).toFixed(2),
+        bankBal: +Number(aPlayers[0].bankBal - aPlayers[1].bankBal).toFixed(2),
+      },
+    };
+
+    return res;
+  }
+
+  public async getPlayersBalDates(
+    dateFrom: DateTime,
+    dateTo: DateTime,
+    assets: IAssetWeight[],
+  ): Promise<IPosPlayersBalance | undefined> {
+    if (assets.length === 0) throw new Error(`Empty assets list.`);
+    if (
+      dateFrom.startOf('day').toMillis() >= dateTo.startOf('day').toMillis()
+    ) {
+      throw new Error(`Parameter Date-From MUST BE after Date-To.`);
+    }
+
+    const aSQL: string[] = [];
+    assets.forEach(a => {
+      aSQL.push(`(SELECT date::DATE as date, "asset-code" asset, 
+        ${a.weight}::NUMERIC as weight, 1 as qtty, 
+        "for_inv_res2689_buy" as foreignbuy, 
+        "for_inv_res2689_sell" as foreignsell, 
+        "inst_inv_national_investor_buy" as nationalbuy, 
+        "inst_inv_national_investor_sell" as nationalsell, 
+        "fin_corp_banks_buy" as bankbuy, 
+        "fin_corp_banks_sell" as banksell
+        FROM "b3-oi-players" 
+        WHERE "asset-code" = '${a.asset}' AND "asset-type"='FUTURES' 
+        AND date::DATE=ANY($1) 
+        ORDER BY date DESC 
+        LIMIT 2)`);
+    });
+
+    const sql = `select date, sum(qtty) as qtty,
+    sum(foreignbuy * weight) as foreignbuy, sum(foreignsell * weight) as foreignsell,
+    sum(nationalbuy * weight) as nationalbuy, sum(nationalsell * weight) as nationalsell,
+    sum(bankbuy * weight) as bankbuy, sum(banksell * weight) as banksell
+    from 
+    (${aSQL.join(' union all ')}) q
+    group by date order by date desc`;
+
+    const qPlayers = await this.queryFactory.runQuery(sql, {
+      date: [dateFrom.toJSDate(), dateTo.toJSDate()],
+    });
+
+    const aPlayers: IPosPlayers[] | undefined = qPlayers.map(
+      (p: any): IPosPlayers => {
+        return {
+          date: DateTime.fromJSDate(p.date),
+          foreignBuy: +Number(p.foreignbuy).toFixed(2),
+          foreignSell: +Number(p.foreignsell).toFixed(2),
+          foreignBal: +Number(p.foreignbuy - p.foreignsell).toFixed(2),
+          nationalBuy: +Number(p.nationalbuy).toFixed(2),
+          nationalSell: +Number(p.nationalsell).toFixed(2),
+          nationalBal: +Number(p.nationalbuy - p.nationalsell).toFixed(2),
+          bankBuy: +Number(p.bankbuy).toFixed(2),
+          bankSell: +Number(p.banksell).toFixed(2),
+          bankBal: +Number(p.bankbuy - p.banksell).toFixed(2),
+        };
+      },
+    );
+    if (
+      !aPlayers ||
+      aPlayers.length < 2 ||
+      qPlayers
+        .map((p: any) => Number(p.qtty))
+        .reduce(
+          (accumulator: number, qtty: number) => (accumulator += qtty),
+          0,
+        ) < 4
+    )
+      return undefined;
+
+    const res: IPosPlayersBalance = {
+      posPlayers: aPlayers,
+      balance: {
+        date: dateTo,
         foreignBal: +Number(
           aPlayers[0].foreignBal - aPlayers[1].foreignBal,
         ).toFixed(2),

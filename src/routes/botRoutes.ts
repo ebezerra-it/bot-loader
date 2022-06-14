@@ -37,13 +37,13 @@ export default class BotRoutes extends BaseRoutes {
     router.post('/sendmsg', this.blockRemoteCall, async (req, res) => {
       const { t, u, m } = req.body; // t - TUserType; u - userId; m - message
       try {
-        if ((!t && !u) || !m)
+        if ((t === undefined && u === undefined) || m === undefined)
           throw new Error(`Missing parameters: t=${t}, u=${u}, m=${m}`);
-        if (u) {
+        if (u !== undefined) {
           const { authType, user } = await this.bot.getUser({ id: u });
           if (authType !== TUserReturnAuthType.AUTH || !user) return;
           this.bot.sendMessage(user.chatId, m);
-        } else if (t) {
+        } else {
           this.bot.sendMessageToUsers(t, m);
         }
       } catch (error) {
@@ -59,7 +59,7 @@ export default class BotRoutes extends BaseRoutes {
       const { e, p } = req.body;
 
       try {
-        const dateRef = DateTime.fromISO(p.d);
+        const dateRef = DateTime.fromJSDate(new Date(p.d));
         if (!dateRef.isValid)
           throw new Error(
             `Invalid date parameter - Params: ${JSON.stringify(p)}`,

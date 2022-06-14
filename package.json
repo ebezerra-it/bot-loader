@@ -11,7 +11,7 @@
     "dev:bot": "ts-node-dev --respawn --poll --exit-child --transpile-only --inspect=0.0.0.0:9229 --ignore-watch node_modules --watch src -- src/app.ts BOT-ONLY",
     "dev:cloudtransfer": "ts-node-dev --respawn --poll --exit-child --transpile-only --inspect=0.0.0.0:9229 --ignore-watch node_modules --watch src -- src/cloudtransfer.ts",    
     "dev:tsloader": "ts-node-dev --respawn --poll --exit-child --transpile-only --inspect=0.0.0.0:9229 --ignore-watch node_modules --watch src -- src/tsloader.ts",
-    "dev:chartloader": "ts-node-dev --respawn --poll --exit-child --transpile-only --inspect=0.0.0.0:9229 --ignore-watch node_modules --watch src -- src/cmechartloader.ts",
+    "dev:chartloader": "ts-node-dev --respawn --poll --exit-child --transpile-only --inspect=0.0.0.0:9229 --ignore-watch node_modules --watch src -- src/tradingviewchartloader.ts",
     "dev:install": "yarn install",
     "prod:install": "yarn install --production=true",
     "dev:typeorm": "ts-node-dev --respawn --poll --exit-child --transpile-only --inspect=0.0.0.0:9229 --ignore-watch node_modules --watch src -- ./node_modules/typeorm/cli.js",

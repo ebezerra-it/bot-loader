@@ -566,11 +566,13 @@ function getCountry(countryCode: TCountryCode): ICountry | null {
 enum TExchange {
   B3 = 'B3',
   CME = 'CME',
+  NASDAQ = 'NASDAQ',
 }
 
 enum TTimezone {
   B3 = 'America/Sao_Paulo',
   CME = 'America/Chicago',
+  NASDAQ = 'America/New_York',
 }
 
 interface IExchange {
@@ -590,6 +592,11 @@ function getExchanges(): IExchange[] {
       exchange: TExchange.B3,
       country: getCountry(TCountryCode.BR)!,
       timezone: TTimezone.B3,
+    },
+    {
+      exchange: TExchange.NASDAQ,
+      country: getCountry(TCountryCode.US)!,
+      timezone: TTimezone.NASDAQ,
     },
   ];
   return exchanges;

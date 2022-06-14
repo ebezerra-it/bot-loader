@@ -784,12 +784,7 @@ export default class AssetsExpiryCME extends ReportLoaderCalendar {
   private async loadAssetsLoadConfig(): Promise<IAssetLoadConfig[]> {
     try {
       const assets: any[] = await loadJSONFile(
-        path.join(
-          __dirname,
-          '../../../',
-          'config/',
-          'cme_assets_load_config.json',
-        ),
+        path.join(__dirname, '../../../', 'config/', 'loadconfig_cme.json'),
       );
 
       const filteredAssets: IAssetLoadConfig[] = assets
@@ -812,13 +807,13 @@ export default class AssetsExpiryCME extends ReportLoaderCalendar {
 
       if (!filteredAssets || filteredAssets.length === 0)
         throw new Error(
-          `[${this.processName}] loadAssetsLoadConfig() - Identified error in file '/config/cme_assets_load_config.json': No asset was selected`,
+          `[${this.processName}] loadAssetsLoadConfig() - Identified error in file '/config/loadconfig_cme.json': No asset was selected`,
         );
 
       return filteredAssets;
     } catch (e) {
       throw new Error(
-        `[${this.processName}] loadAssetsLoadConfig() - Identified error when parsing file '/config/cme_assets_load_config.json': ${e.message}`,
+        `[${this.processName}] loadAssetsLoadConfig() - Identified error when parsing file '/config/loadconfig_cme.json': ${e.message}`,
       );
     }
   }

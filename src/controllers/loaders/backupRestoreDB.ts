@@ -8,6 +8,7 @@ import { TCountryCode } from '../tcountry';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
 import ReportLoader, { ILoadResult } from '../reportLoader';
 import { TUserType } from '../../bot/telegramBot';
+import { TLoadStatus } from '../task';
 
 export default class BackupRestoreDB extends ReportLoader {
   public async process(params: {
@@ -43,9 +44,9 @@ export default class BackupRestoreDB extends ReportLoader {
 
       process.env.RESTOREDB = 'TRUE'; // used to stop user bot control
 
-      await this.throwBotEvent('sendmsg', {
-        t: TUserType.DEFAULT,
-        m: `[Service OFFLINE] Database restore procedure in progress and service is OFFLINE. Please, wait...`,
+      await this.sendBotMsgToUsers({
+        userType: TUserType.DEFAULT,
+        message: `[Service OFFLINE] Database restore procedure in progress and service is OFFLINE. Please, wait...`,
       });
 
       await this.sleep(30);
@@ -58,9 +59,9 @@ export default class BackupRestoreDB extends ReportLoader {
 
       delete process.env.RESTOREDB;
 
-      await this.throwBotEvent('sendmsg', {
-        t: TUserType.DEFAULT,
-        m: `[Service ONLINE] Database restore procedure finished and service is now ONLINE!`,
+      await this.sendBotMsgToUsers({
+        userType: TUserType.DEFAULT,
+        message: `[Service ONLINE] Database restore procedure finished and service is now ONLINE!`,
       });
 
       this.logger.warn(
@@ -70,6 +71,47 @@ export default class BackupRestoreDB extends ReportLoader {
       );
 
       return { inserted: 1, deleted: 1 };
+    }
+
+    if (
+      String(process.env.BACKUP_WAIT_FOR_DEPENDECY_LIST).toUpperCase() ===
+      'TRUE'
+    ) {
+      const dependencyList = String(process.env.BACKUP_PROCESS_DEPENDECY_LIST)
+        .split(',')
+        .map(p => p.trim().toUpperCase());
+
+      if (dependencyList && dependencyList.length > 0) {
+        const qProcess = await this.queryFactory.runQuery(
+          `SELECT process FROM "loadcontrol" WHERE "date-ref"=$1 AND status=$2`,
+          {
+            dateRef: params.dateRef.toJSDate(),
+            status: TLoadStatus.DONE,
+          },
+        );
+
+        let allDependenciesDone = true;
+        const waitingProcess: string[] = [];
+
+        dependencyList.forEach(d => {
+          if (
+            !qProcess.find((p: any) => String(p.process).toUpperCase() !== d)
+          ) {
+            allDependenciesDone = false;
+            waitingProcess.push(d);
+          }
+        });
+
+        if (!allDependenciesDone) {
+          this.logger.warn(
+            `[${
+              this.processName
+            }] Process won't initiate due to pending process: ${waitingProcess.join(
+              ', ',
+            )}.`,
+          );
+        }
+      }
     }
 
     await BackupRestoreDB.backupDataBase(backupPathFileName);
@@ -122,7 +164,9 @@ export default class BackupRestoreDB extends ReportLoader {
       } --port=${process.env.DB_PORT} --clean --if-exists --no-owner --role=${
         process.env.DB_USER
       } --no-password --dbname=${process.env.DB_NAME}${
-        restoreTable && restoreTable !== 'ALL' ? ` --table=${restoreTable}` : ''
+        restoreTable && restoreTable.toUpperCase() !== 'ALL'
+          ? ` --table=${restoreTable}`
+          : ''
       }`,
     );
 
@@ -301,11 +345,17 @@ export default class BackupRestoreDB extends ReportLoader {
 
       if (filesToDelete.length > retention - 1) {
         for (let i = 0; filesToDelete.length - i > retention - 1; i++) {
-          await filesToDelete[i].file.delete();
-          deleted++;
-          this.logger.silly(
-            `[${this.processName}] Cloud backup file deleted: ${filesToDelete[i].file.name}`,
-          );
+          try {
+            await filesToDelete[i].file.delete();
+            deleted++;
+            this.logger.silly(
+              `[${this.processName}] Cloud backup file deleted: ${filesToDelete[i].file.name}`,
+            );
+          } catch (err) {
+            this.logger.error(
+              `[${this.processName}] Cloud backup file ${filesToDelete[i].file.name} couldn't be deleted due to error: ${err.message}`,
+            );
+          }
         }
       }
     }

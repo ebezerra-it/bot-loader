@@ -12,6 +12,7 @@ import { DateTime } from 'luxon';
 import { iterateStreamLines } from '@mangosteen/line-by-line';
 import { isNumber } from '../utils';
 import { IExchange, TExchange, getExchange } from '../tcountry';
+import { TDataOrigin } from '../../db/migrations/1634260181468-tbl_b3_ts_summary';
 
 enum TFileSizeUnit {
   BYTES = 0,
@@ -305,7 +306,7 @@ const LAYOUT_PROFIT_ROLLING_TT: IFileLayout = {
       dbColumn: 'origin',
       decimalSeparator: ',',
       thousandSeparator: '.',
-      fixedValue: 3,
+      fixedValue: TDataOrigin.PROFIT_LOADER,
       transformFunction: undefined,
     },
   ],
@@ -575,7 +576,7 @@ const LAYOUT_PROFIT_1M: IFileLayout = {
       dbColumn: 'origin',
       decimalSeparator: ',',
       thousandSeparator: '.',
-      fixedValue: 3,
+      fixedValue: TDataOrigin.PROFIT_LOADER,
       transformFunction: undefined,
     },
   ],
@@ -765,7 +766,7 @@ const LAYOUT_PROFIT_FRP: IFileLayout = {
       dbColumn: 'origin',
       decimalSeparator: ',',
       thousandSeparator: '.',
-      fixedValue: 3,
+      fixedValue: TDataOrigin.PROFIT_LOADER,
       transformFunction: undefined,
     },
   ],

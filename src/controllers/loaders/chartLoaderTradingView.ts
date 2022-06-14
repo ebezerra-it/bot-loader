@@ -1,27 +1,22 @@
-/* eslint-disable no-nested-ternary */
+/* eslint-disable no-continue */
 /* eslint-disable no-loop-func */
-/* eslint-disable no-empty-pattern */
 /* eslint-disable no-useless-escape */
 /* eslint-disable no-async-promise-executor */
-/* eslint-disable no-continue */
 /* eslint-disable no-empty */
 /* eslint-disable no-restricted-syntax */
 import { Page } from 'puppeteer';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { DateTime } from 'luxon';
-import axios from 'axios';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
 import { ILoadResult } from '../reportLoader';
-import SummaryCME, { IAsset } from './summaryCME';
+import { loadJSONConfigFile } from '../utils';
+import { IExchange, getExchange } from '../tcountry';
 import { TChartDataOrigin } from '../../db/migrations/1653872110319-tbl_chartdata';
 
-interface IContract {
+interface ITradingViewSymbol {
   code: string;
-  letter: string;
-  year: number;
-  volumeDay: number;
-  exchangeCode: string | undefined;
+  exchange: IExchange;
 }
 
 interface ICandle {
@@ -33,7 +28,7 @@ interface ICandle {
   volume: number;
 }
 
-class ChartLoaderCME extends ReportLoaderCalendar {
+class ChartLoaderTradingView extends ReportLoaderCalendar {
   public async process(params: { dateMatch: DateTime }): Promise<ILoadResult> {
     this.logger.info(
       `[${
@@ -42,6 +37,26 @@ class ChartLoaderCME extends ReportLoaderCalendar {
         'dd/MM/yyyy HH:mmZ',
       )}`,
     );
+
+    const results: ILoadResult[] = [];
+    const symbols: ITradingViewSymbol[] = (
+      await this.getAllTradingViewSymbols()
+    )
+      .filter(s => s.chartLoad === true)
+      .map(s => {
+        return {
+          code: s.symbol,
+          exchange: s.exchange,
+        };
+      })
+      .filter(s => !!(s.code && s.exchange));
+
+    if (symbols.length === 0) {
+      this.logger.warn(
+        `[${this.processName}] No symbols selected for chart loading.`,
+      );
+      return { inserted: -1, deleted: 0 };
+    }
 
     puppeteer.use(StealthPlugin());
     const browser = await puppeteer.launch({
@@ -59,23 +74,18 @@ class ChartLoaderCME extends ReportLoaderCalendar {
     });
     const page = await browser.newPage();
 
-    const results: ILoadResult[] = [];
-    const assets = (await this.getAllCMEAssets()).filter(
-      a => a.chartLoadFutures,
-    );
     try {
-      for await (const asset of assets) {
-        const res = await this.loadChartDataAsset(asset, page);
-        this.logger.silly(
-          `[${this.processName}] Asset ${
-            asset.globexcode
-          } - Candles loaded: ${JSON.stringify(res)}`,
-        );
+      for await (const symbol of symbols) {
+        const res = await this.loadChartData(symbol, page);
         results.push(res);
       }
     } finally {
       try {
-        if (browser) await browser.close();
+        if (browser) {
+          const browserPId = browser.process()!.pid!;
+          process.kill(browserPId);
+          // await browser.close();
+        }
       } catch (e) {}
     }
 
@@ -89,8 +99,8 @@ class ChartLoaderCME extends ReportLoaderCalendar {
       : { inserted: 0, deleted: 0 };
   }
 
-  private async loadChartDataAsset(
-    asset: IAsset,
+  private async loadChartData(
+    symbol: ITradingViewSymbol,
     page: Page,
   ): Promise<ILoadResult> {
     const sql = `INSERT INTO "chartdata" 
@@ -101,209 +111,86 @@ class ChartLoaderCME extends ReportLoaderCalendar {
 
     let inserted = 0;
 
-    let contracts: IContract[] = await this.retry({
-      action: 'GET_ASSET_CONTRACTS',
-      asset,
-    });
-    const qContracts = await this.queryFactory.runQuery(
-      `SELECT contract FROM "cme-summary" 
-      WHERE globexcode=$1 AND SUBSTRING(contract, 2, 2) >= $2
-      GROUP BY contract 
-      ORDER BY SUBSTRING(contract, 2, 2) ASC, SUBSTRING(contract, 1, 1) ASC`,
+    await this.sleep(
+      Number(process.env.TRADINGVIEW_CHARTLOAD_QUERY_INTERVAL || '5'),
+    );
+    const qLastTS = await this.queryFactory.runQuery(
+      `SELECT MAX("timestamp-open") lastts FROM "chartdata" WHERE "asset-code"=$1 AND contract=$2 AND origin=$3`,
       {
-        globexcode: asset.globexcode,
-        year: String(DateTime.now().year - 1).substring(2, 4),
+        assetCode: symbol.code,
+        contract: 'SPOT',
+        origin: TChartDataOrigin.TRADINGVIEW,
       },
     );
-    if (qContracts && qContracts.length > 0) {
-      contracts = contracts.filter(c =>
-        qContracts.find((qc: any) => qc.contract === c.code || c.volumeDay > 0),
-      );
-    }
 
-    if (!contracts) return { inserted: 0, deleted: 0 };
-
-    for await (const contract of contracts) {
-      if (!contract.exchangeCode) {
-        this.logger.warn(
-          `[${
-            this.processName
-          }] Unindentified contract exchange code - Asset: ${
-            asset.globexcode
-          } - Contract: ${JSON.stringify(contract)}`,
-        );
-        // continue; // keep it processing and the exchangecode is ignored in TradingView url
-      }
-
-      await this.sleep(Number(process.env.CME_CHARTLOAD_QUERY_INTERVAL || '5'));
-      const qLastTS = await this.queryFactory.runQuery(
-        `SELECT MAX("timestamp-open") lastts FROM "chartdata" WHERE "asset-code"=$1 AND contract=$2 AND origin=$3`,
-        {
-          assetCode: asset.globexcode,
-          contract: contract.code,
-          origin: TChartDataOrigin.CME,
-        },
+    let tsLastLoad: DateTime;
+    if (!qLastTS || qLastTS.length === 0 || !qLastTS[0].lastts) {
+      const now = DateTime.now().setZone(symbol.exchange.timezone); // (this.exchange.timezone);
+      const lastTradeDate = await this.subTradeDays(
+        now,
+        1,
+        symbol.exchange.country.code,
+        // this.exchange.country.code,
       );
 
-      let tsLastLoad: DateTime;
-      if (!qLastTS || qLastTS.length === 0 || !qLastTS[0].lastts) {
-        const now = DateTime.now().setZone(this.exchange.timezone);
-        const lastTradeDate = await this.subTradeDays(
-          now,
-          1,
-          this.exchange.country.code,
-        );
-
-        tsLastLoad = lastTradeDate.set({
-          hour: 8,
-          minute: 0,
-          second: 0,
-          millisecond: 0,
-        });
-      } else {
-        tsLastLoad = DateTime.fromJSDate(qLastTS[0].lastts, {
-          zone: this.exchange.timezone,
-        });
-      }
-
-      const aCandleData: ICandle[] = await this.retry({
-        action: 'GET_ASSET_CONTRACT_CANDLES',
-        asset,
-        contract,
-        page,
-        tsLastLoad,
+      tsLastLoad = lastTradeDate.set({
+        hour: 9,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
       });
-
-      let insertedContract = 0;
-      for await (const candle of aCandleData) {
-        await this.queryFactory.runQuery(sql, {
-          assetCode: asset.globexcode,
-          contract: contract.code,
-          timestampopen: candle.timestamp.toJSDate(),
-          open: candle.open,
-          close: candle.close,
-          high: candle.high,
-          low: candle.low,
-          volume: candle.volume,
-          origin: TChartDataOrigin.CME,
-        });
-        inserted++;
-        insertedContract++;
-      }
-
-      this.logger.silly(
-        `[${this.processName}] Asset ${asset.globexcode} - Contract ${
-          contract.code
-        } - Candles loaded: ${insertedContract} - DateTime From: ${tsLastLoad.toFormat(
-          'dd/MM/yyyy HH:mmZ',
-        )}`,
-      );
+    } else {
+      tsLastLoad = DateTime.fromJSDate(qLastTS[0].lastts, {
+        zone: symbol.exchange.timezone, // this.exchange.timezone,
+      });
     }
+
+    const aCandleData: ICandle[] = await this.retry({
+      action: 'GET_SYMBOL_CANDLES',
+      symbol,
+      page,
+      tsLastLoad,
+    });
+
+    for await (const candle of aCandleData) {
+      await this.queryFactory.runQuery(sql, {
+        assetCode: symbol.code,
+        contract: 'SPOT',
+        timestampopen: candle.timestamp.toJSDate(),
+        open: candle.open,
+        close: candle.close,
+        high: candle.high,
+        low: candle.low,
+        volume: candle.volume,
+        origin: TChartDataOrigin.TRADINGVIEW,
+      });
+      inserted++;
+    }
+
+    this.logger.silly(
+      `[${this.processName}] Symbol ${
+        symbol.code
+      } - Candles loaded: ${inserted} - DateTime From: ${tsLastLoad.toFormat(
+        'dd/MM/yyyy HH:mmZ',
+      )}`,
+    );
+
     return { inserted, deleted: 0 };
   }
 
   public async performQuery(params: {
     action: string;
-    pageNumber?: string;
-    asset?: IAsset;
-    contract?: IContract;
-    page?: Page;
+    symbol: ITradingViewSymbol;
+    page: Page;
     tsLastLoad?: DateTime;
-  }): Promise<
-    IContract[] | ICandle[] | { assets: IAsset[]; totalPages: number }
-  > {
-    if (params.action === 'GET_ASSETS') {
-      if (!params.pageNumber)
-        throw new Error(
-          `[${this.processName}] PerformQuery() - Action: GET_ASSETS - Missing parameters`,
-        );
-
-      const url = `https://www.cmegroup.com/services/product-slate?sortAsc=false&pageNumber=${
-        params.pageNumber
-      }&cleared=Futures&pageSize=${process.env.CME_REQUEST_PAGESIZE || '5000'}`;
-
-      const headers = {
-        'Accept-Encoding': 'gzip, deflate, br',
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36',
-        Connection: 'keep-alive',
-        'Cache-Control': 'max-age=0',
-      };
-      const api = axios.create();
-      const aAssets: IAsset[] = [];
-      const res = (await api.get(url, { headers })).data;
-      if (res && res.products && res.products.length > 0) {
-        res.products.forEach((p: any) => {
-          aAssets.push({
-            globexcode: p.globex,
-            caption: p.name,
-            productId: p.id,
-            summaryFutures: false,
-            summaryOptions: false,
-            chartLoadFutures: false,
-          });
-        });
-      }
-      return { assets: aAssets, totalPages: res.props.pageTotal };
-    }
-
-    if (params.action === 'GET_ASSET_CONTRACTS') {
-      if (!params.asset)
-        throw new Error(
-          `[${
-            this.processName
-          }] PerformQuery() - Action: GET_ASSET_CONTRACTS - Missing parameters: ${JSON.stringify(
-            params,
-          )}`,
-        );
-
-      const contracts: IContract[] = [];
-      const url = `https://www.cmegroup.com/CmeWS/mvc/Quotes/Future/${params.asset.productId}/G`;
-
-      const headers = {
-        'Accept-Encoding': 'gzip, deflate, br',
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36',
-        Connection: 'keep-alive',
-        'Cache-Control': 'max-age=0',
-      };
-      const api = axios.create();
-      const resContracts = (await api.get(url, { headers })).data;
-      if (resContracts.quotes && resContracts.quotes.length > 0) {
-        resContracts.quotes.forEach((c: any) => {
-          if (c.priceChart) {
-            contracts.push({
-              code: [
-                c.priceChart.monthYear.slice(0, 1),
-                String(c.priceChart.year).slice(2, 4),
-              ].join(''),
-              letter: c.priceChart.monthYear.slice(0, 1),
-              year: c.priceChart.year,
-              volumeDay: Number(String(c.volume).replace(/,/g, '')),
-              exchangeCode:
-                c.exchangeCode === 'XCME'
-                  ? 'CME_GBX'
-                  : c.exchangeCode === 'XNYM'
-                  ? 'NYMEX_GBX'
-                  : c.exchangeCode === 'XCBT'
-                  ? 'CBOT_GBX'
-                  : c.exchangeCode === 'XCEC'
-                  ? 'COMEX_GBX'
-                  : undefined,
-            });
-          }
-        });
-      }
-      return contracts;
-    }
-
+  }): Promise<ICandle[]> {
     // Read chart websocket
-    if (params.action === 'GET_ASSET_CONTRACT_CANDLES') {
-      if (!params.asset || !params.contract || !params.page)
+    if (params.action === 'GET_SYMBOL_CANDLES') {
+      if (!params.symbol || !params.page)
         throw new Error(
           `[${
             this.processName
-          }] PerformQuery() - Action: GET_ASSET_CONTRACT_CANDLES - Missing parameters: ${JSON.stringify(
+          }] PerformQuery() - Action: GET_SYMBOL_CANDLES - Missing parameters: ${JSON.stringify(
             params,
           )}`,
         );
@@ -311,19 +198,8 @@ class ChartLoaderCME extends ReportLoaderCalendar {
       try {
         await params.page!.evaluate(() => window.stop());
       } catch (e) {}
-      const url = `https://s.tradingview.com/cmewidgetembed/?frameElementId=tradingview_fa45f&symbol=${
-        params.contract.exchangeCode
-          ? params.contract.exchangeCode.concat('%3A') // 'CME:6LM2022'
-          : ''
-      }${params.asset.globexcode}${params.contract.letter}${
-        params.contract.year
-      }&interval=1&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=E4E8EB&studies=%5B%5D&style=0&studies_overrides=%7B%7D&overrides=%7B%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&venue=0&utm_source=www.cmegroup.com&utm_medium=widget&utm_campaign=chart&utm_term=${
-        params.contract.exchangeCode
-          ? params.contract.exchangeCode.concat('%3A')
-          : ''
-      }${params.asset.globexcode}${params.contract.letter}${
-        params.contract.year
-      }`;
+
+      const url = `https://www.tradingview.com/chart/?symbol=${params.symbol.code}&interval=1`;
 
       await params.page.setUserAgent(
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.131 Safari/537.36',
@@ -338,14 +214,15 @@ class ChartLoaderCME extends ReportLoaderCalendar {
       await cdp.send('Page.enable');
 
       const aCandle: ICandle[] = [];
+      let finished = false;
       let queryTimeout: NodeJS.Timeout;
       let chartSession: string | undefined;
 
       await new Promise<void>(async (resolve, reject): Promise<void> => {
         const timeoutInterval =
-          (Number(process.env.CME_CHARTLOAD_TIMEOUT || '15') < 15
+          (Number(process.env.TRADINGVIEW_CHARTLOAD_TIMEOUT || '15') < 15
             ? 15
-            : Number(process.env.CME_CHARTLOAD_TIMEOUT || '15')) * 1000;
+            : Number(process.env.TRADINGVIEW_CHARTLOAD_TIMEOUT || '15')) * 1000;
         const doTimeout = async () => {
           try {
             await params.page!.evaluate(() => window.stop());
@@ -361,11 +238,7 @@ class ChartLoaderCME extends ReportLoaderCalendar {
 
           reject(
             new Error(
-              `[${this.processName}] Chart timed out - Asset: ${
-                params.asset!.globexcode
-              } - Contract: ${params.contract!.code} - Candles loaded: ${
-                aCandle.length
-              }`,
+              `[${this.processName}] Chart timed out - Symbol: ${params.symbol.code} - Candles loaded: ${aCandle.length}`,
             ),
           );
         };
@@ -387,6 +260,7 @@ class ChartLoaderCME extends ReportLoaderCalendar {
               await params.page!.evaluate(() => window.stop());
             } catch (e) {}
             resolve();
+            return;
           }
 
           const fixed = `[${msg
@@ -415,7 +289,7 @@ class ChartLoaderCME extends ReportLoaderCalendar {
 
               reject(
                 new Error(
-                  `[${this.processName}] Chart wrong_data message found - Asset: ${params.asset?.globexcode} - Contract: ${params.contract?.code} - Last ts chart: ${aCandle[0].timestamp} - Last ts in DB: ${params.tsLastLoad}`,
+                  `[${this.processName}] Chart wrong_data message found - Symbol: ${params.symbol.code} - Last ts chart: ${aCandle[0].timestamp} - Last ts in DB: ${params.tsLastLoad}`,
                 ),
               );
             } else if (
@@ -437,7 +311,7 @@ class ChartLoaderCME extends ReportLoaderCalendar {
                 const tsCandle = DateTime.fromMillis(
                   Number(objMsg.p[1].sds_1.s[i].v[0]) * 1000,
                   {
-                    zone: this.exchange.timezone,
+                    zone: params.symbol.exchange.timezone, // this.exchange.timezone,
                   },
                 );
                 if (
@@ -452,6 +326,14 @@ class ChartLoaderCME extends ReportLoaderCalendar {
                 )
                   continue;
 
+                /* if (
+                  params.tsLastLoad &&
+                  tsCandle.toMillis() < params.tsLastLoad.toMillis()
+                ) {
+                  finished = true;
+                  // break;
+                } */
+
                 if (
                   !params.tsLastLoad ||
                   tsCandle.toMillis() >= params.tsLastLoad.toMillis()
@@ -464,14 +346,23 @@ class ChartLoaderCME extends ReportLoaderCalendar {
                     low: objMsg.p[1].sds_1.s[i].v[3],
                     volume: objMsg.p[1].sds_1.s[i].v[5],
                   });
-                }
+                } else finished = true;
+                /*                 if (
+                  params.tsLastLoad &&
+                  tsCandle.toMillis() === params.tsLastLoad.toMillis()
+                ) {
+                  finished = true;
+                  // break;
+                } */
               }
 
               aCandle.unshift(...msgCandles);
               if (
                 aCandle.length !== 0 &&
                 params.tsLastLoad &&
-                aCandle[0].timestamp.toMillis() > params.tsLastLoad.toMillis()
+                aCandle[0].timestamp.toMillis() >
+                  params.tsLastLoad.toMillis() &&
+                !finished
               ) {
                 if (!chartSession) {
                   try {
@@ -488,7 +379,7 @@ class ChartLoaderCME extends ReportLoaderCalendar {
 
                   reject(
                     new Error(
-                      `Couldn't find chart session - Asset: ${params.asset?.globexcode} - Contract: ${params.contract?.code} - Last ts chart: ${aCandle[0].timestamp} - Last ts in DB: ${params.tsLastLoad}`,
+                      `Couldn't find chart session - Symbol: ${params.symbol.code} - Last ts chart: ${aCandle[0].timestamp} - Last ts in DB: ${params.tsLastLoad}`,
                     ),
                   );
                 }
@@ -500,11 +391,13 @@ class ChartLoaderCME extends ReportLoaderCalendar {
 
                 const maxReqData =
                   Number(
-                    process.env.CME_CHARTLOAD_CANDLE_MAX_REQUEST_DATA || '3780',
+                    process.env.TRADINGVIEW_CHARTLOAD_CANDLE_MAX_REQUEST_DATA ||
+                      '3780',
                   ) > 3780
                     ? 3780
                     : Number(
-                        process.env.CME_CHARTLOAD_CANDLE_MAX_REQUEST_DATA ||
+                        process.env
+                          .TRADINGVIEW_CHARTLOAD_CANDLE_MAX_REQUEST_DATA ||
                           '3780',
                       );
                 const jsonReqData = `{"m":"request_more_data","p":["${chartSession}","sds_1",${
@@ -518,8 +411,8 @@ class ChartLoaderCME extends ReportLoaderCalendar {
 
                 const msgSent = await params.page!.evaluate(
                   (wsSockets, msgReqData) => {
-                    // wss://data-cme-v2.tradingview.com/socket.io/websocket?from=cmewidgetembed%2F&date=2022_03_14-11_19
                     // wss://pushstream.tradingview.com/message-pipe-ws/public
+                    // wss://data.tradingview.com/socket.io/websocket?from=chart%2F&date=2022_05_27-14_06
                     const wsChart = wsSockets.find(
                       (ws: any) =>
                         ws.url.includes('tradingview.com') &&
@@ -560,13 +453,18 @@ class ChartLoaderCME extends ReportLoaderCalendar {
 
                   reject(
                     new Error(
-                      `[${this.processName}] Couldn't send request_more_data messsage - Asset: ${params.asset?.globexcode} - Contract: ${params.contract?.code} - Last ts chart: ${aCandle[0].timestamp} - Last ts in DB: ${params.tsLastLoad}`,
+                      `[${this.processName}] Couldn't send request_more_data messsage - Symbol: ${params.symbol.code} - Last ts chart: ${aCandle[0].timestamp} - Last ts in DB: ${params.tsLastLoad}`,
                     ),
                   );
                 }
                 // Restart timeout
                 queryTimeout = setTimeout(doTimeout, timeoutInterval);
                 readingData = false;
+                return;
+              }
+
+              if (finished) {
+                resolve();
                 return;
               }
 
@@ -613,50 +511,31 @@ class ChartLoaderCME extends ReportLoaderCalendar {
     );
   }
 
-  public async getAllCMEAssets(): Promise<IAsset[]> {
-    const aAssets: IAsset[] = [];
-    let pageNumber = 1;
-    let totalPages = 1;
+  public async getAllTradingViewSymbols(): Promise<any[]> {
+    const symbols: any[] = (
+      await loadJSONConfigFile('loadconfig_tradingview.json')
+    ).map((s: any) => {
+      return {
+        symbol: s.symbol,
+        exchange: getExchange(s.exchange),
+        chartLoad: s.chartLoad,
+      };
+    });
 
-    while (pageNumber <= totalPages) {
-      const res = await this.retry({ action: 'GET_ASSETS', pageNumber });
-      aAssets.push(...res.assets);
-
-      totalPages = res.totalPages;
-      pageNumber++;
-
-      if (pageNumber <= totalPages)
-        await this.sleep(Number(process.env.CME_QUERY_INTERVAL || '0'));
-    }
-
-    if (aAssets.length === 0)
+    if (!symbols || symbols.length === 0)
       throw new Error(
-        `[${this.processName}] getAllCMEAssets() - Unable to retrieve assets from CME - GET_ASSETS`,
+        'Empty TradindView Config File: config/loadconfig_tradingview.json',
       );
 
-    return (await SummaryCME.getCMEAssets())
-      .map(a => {
-        const asset = aAssets.find(aa => aa.globexcode === a.globexcode);
-        if (!asset) {
-          this.logger.warn(
-            `[${
-              this.processName
-            }] getAllCMEAssets() - CME/JSON file asset not found in CME data or productId mismatch - CME data Asset: ${JSON.stringify(
-              asset,
-            )} - JSON file Asset: ${JSON.stringify(a)}`,
-          );
-        }
-        return {
-          globexcode: a.globexcode,
-          caption: asset ? asset.caption : '',
-          productId: asset ? asset.productId : 0,
-          summaryFutures: a.summaryFutures,
-          summaryOptions: a.summaryOptions,
-          chartLoadFutures: a.chartLoadFutures,
-        };
-      })
-      .filter(aaa => aaa.productId > 0);
+    if (symbols.find((s: any) => !s.exchange))
+      throw new Error(
+        `Wrong Exchange in TradindView Config File: config/loadconfig_tradingview.json: ${JSON.stringify(
+          symbols.filter((s: any) => !s.exchange),
+        )}`,
+      );
+
+    return symbols.filter((s: any) => !!s.exchange);
   }
 }
 
-export default ChartLoaderCME;
+export default ChartLoaderTradingView;

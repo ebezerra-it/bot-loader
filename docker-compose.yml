@@ -18,9 +18,9 @@ services:
       - |
         yarn dev
 #        yarn dev:typeorm migration:run
-#        yarn dev:tsloader
-#        yarn dev:cloudtransfer
 #        yarn dev:chartloader
+#        yarn dev:cloudtransfer
+#        yarn dev:tsloader
 #        sleep infinity
 
     network_mode: service:myoraculum-postgres

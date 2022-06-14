@@ -829,13 +829,11 @@ class SummaryCME extends ReportLoaderCalendar {
   }
 
   public static async getCMEAssets(): Promise<any[]> {
-    const assets: any[] = await loadJSONConfigFile(
-      'cme_assets_load_config.json',
-    );
+    const assets: any[] = await loadJSONConfigFile('loadconfig_cme.json');
 
     if (!assets || assets.length === 0)
       throw new Error(
-        'Empty CME Assets Config File: config/cme_assets_load_config.json',
+        'Empty CME Assets Config File: config/loadconfig_cme.json',
       );
 
     return assets;

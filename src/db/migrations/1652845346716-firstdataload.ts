@@ -21,6 +21,7 @@ import DataFileLoader, {
 import CloudFileManager from '../../controllers/cloudFileManager';
 import ZipFileManager from '../../controllers/zipFileManager';
 import BackupRestoreDB from '../../controllers/loaders/backupRestoreDB';
+import { TDataOrigin } from './1634260181468-tbl_b3_ts_summary';
 
 export default class firstdataload1652845346716 implements MigrationInterface {
   private async createDirectory(dir: string | undefined): Promise<void> {
@@ -301,10 +302,14 @@ export default class firstdataload1652845346716 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DELETE FROM "b3-rollingtrades" WHERE origin=3`);
+    await queryRunner.query(
+      `DELETE FROM "b3-rollingtrades" WHERE origin=${TDataOrigin.PROFIT_LOADER}`,
+    );
     await queryRunner.query(`VACUUM(FULL) "b3-rollingtrades"`);
 
-    await queryRunner.query(`DELETE FROM "b3-ts-summary" WHERE origin=3`);
+    await queryRunner.query(
+      `DELETE FROM "b3-ts-summary" WHERE origin=${TDataOrigin.PROFIT_LOADER}`,
+    );
     await queryRunner.query(`VACUUM(FULL) "b3-ts-summary"`);
   }
 }

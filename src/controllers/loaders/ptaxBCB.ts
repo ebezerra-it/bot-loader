@@ -8,6 +8,13 @@ import { ILoadResult } from '../reportLoader';
 import { TCurrencyCode } from '../tcountry';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
 
+// schedule: */30 0-10,30-40 10-13,14-15 * * MON-FRI
+/* 
+  schedule instructions:
+  business days: 10:00-10:10, 11:00-11:10, 12:00-12:10, 13:00-13:10
+  holidays: 14:30-14:40, 15:30-15:40 
+*/
+
 enum TPTAXType {
   INTERMEDIATES = 3,
   FINAL = 1,
@@ -54,6 +61,7 @@ class PtaxBCB extends ReportLoaderCalendar {
   async process(params: {
     dateRef: DateTime;
     dateMatch: DateTime;
+    lastTaskOfDay: boolean | undefined;
   }): Promise<ILoadResult> {
     this.logger.info(
       `[${
@@ -63,7 +71,7 @@ class PtaxBCB extends ReportLoaderCalendar {
       )} - DateMatch: ${params.dateMatch.toFormat('dd/MM/yyyy HH:mm:ssZ')}`,
     );
 
-    return this.getBCBReportAssets(params.dateRef);
+    return this.getBCBReportAssets(params.dateRef, params.lastTaskOfDay);
   }
 
   async performQuery(params: { url: string; postData: any }): Promise<any> {
@@ -75,7 +83,10 @@ class PtaxBCB extends ReportLoaderCalendar {
     });
   }
 
-  public async getBCBReportAssets(dateRef: DateTime): Promise<ILoadResult> {
+  public async getBCBReportAssets(
+    dateRef: DateTime,
+    lastTaskOfDay: boolean | undefined,
+  ): Promise<ILoadResult> {
     const assets = this.getAllAssets();
     const loadResults: ILoadResult[] = [];
 
@@ -95,6 +106,7 @@ class PtaxBCB extends ReportLoaderCalendar {
         const loadResult: ILoadResult = await this.getBCBReport(
           dateRef,
           asset.currencyCode,
+          lastTaskOfDay,
         );
         loadResults.push(loadResult);
       }
@@ -113,6 +125,7 @@ class PtaxBCB extends ReportLoaderCalendar {
   public async getBCBReport(
     dateRef: DateTime,
     currencyCode: TCurrencyCode,
+    lastTaskOfDay: boolean | undefined,
   ): Promise<ILoadResult> {
     const asset = this.getAsset(currencyCode);
 
@@ -120,9 +133,30 @@ class PtaxBCB extends ReportLoaderCalendar {
       throw new Error(`CurrencyCode: [${currencyCode}] - Unknown asset`);
     }
 
-    const pdatetime: (DateTime | null)[] = [];
-    const pbrl_ptax: { buy: number | null; sell: number | null }[] = [];
-    const pusd_ptax: { buy: number | null; sell: number | null }[] = [];
+    const pbrl_ptax_previews: {
+      dateTime: DateTime;
+      buy: number | null;
+      sell: number | null;
+    }[] = [];
+    const pusd_ptax_previews: {
+      dateTime: DateTime;
+      buy: number | null;
+      sell: number | null;
+    }[] = [];
+    let pbrl_ptax_final:
+      | {
+          dateTime: DateTime;
+          buy: number | null;
+          sell: number | null;
+        }
+      | undefined;
+    let pusd_ptax_final:
+      | {
+          dateTime: DateTime;
+          buy: number | null;
+          sell: number | null;
+        }
+      | undefined;
 
     const url =
       'https://ptax.bcb.gov.br/ptax_internet/consultaBoletim.do?method=consultarBoletim';
@@ -150,7 +184,8 @@ class PtaxBCB extends ReportLoaderCalendar {
       let dateTime: DateTime;
       if (tbody) {
         const rows = tbody.querySelectorAll('tr');
-        now = DateTime.now();
+        now = DateTime.now().setZone(this.exchange.timezone);
+
         for (let i = 0; i < rows.length; i++) {
           const tds = rows[i].querySelectorAll('td');
           if (tds.length < 6) {
@@ -164,33 +199,40 @@ class PtaxBCB extends ReportLoaderCalendar {
             'dd/MM/yyyy HH:mm',
             { zone: this.exchange.timezone },
           );
-          const { hour } = dateTime;
-          let j = i;
-          while (j < hour - 10 && j < 4) {
-            pdatetime.push(null);
-            pbrl_ptax.push({ buy: null, sell: null });
-            pusd_ptax.push({ buy: null, sell: null });
-            j++;
-          }
 
           if (
             dateTime.startOf('day').toMillis() ===
               now.startOf('day').toMillis() &&
             now.hour === dateTime.hour &&
-            now.minute <= 10
+            now.minute - dateTime.minute <= 10
           ) {
             dateTime = now;
           }
 
-          pdatetime.push(dateTime);
-          pbrl_ptax.push({
-            buy: parseFloat(tds[2].rawText.replace(',', '.')),
-            sell: parseFloat(tds[3].rawText.replace(',', '.')),
-          });
-          pusd_ptax.push({
-            buy: parseFloat(tds[4].rawText.replace(',', '.')),
-            sell: parseFloat(tds[5].rawText.replace(',', '.')),
-          });
+          if (tds[1].rawText.trim().toUpperCase().includes('FECH. PTAX')) {
+            pbrl_ptax_final = {
+              dateTime,
+              buy: parseFloat(tds[2].rawText.replace(',', '.')),
+              sell: parseFloat(tds[3].rawText.replace(',', '.')),
+            };
+
+            pusd_ptax_final = {
+              dateTime,
+              buy: parseFloat(tds[4].rawText.replace(',', '.')),
+              sell: parseFloat(tds[5].rawText.replace(',', '.')),
+            };
+          } else {
+            pbrl_ptax_previews.push({
+              dateTime,
+              buy: parseFloat(tds[2].rawText.replace(',', '.')),
+              sell: parseFloat(tds[3].rawText.replace(',', '.')),
+            });
+            pusd_ptax_previews.push({
+              dateTime,
+              buy: parseFloat(tds[4].rawText.replace(',', '.')),
+              sell: parseFloat(tds[5].rawText.replace(',', '.')),
+            });
+          }
         }
       }
     } else {
@@ -223,29 +265,17 @@ class PtaxBCB extends ReportLoaderCalendar {
             tds.length >= 6 &&
             tds[0].rawText.trim() === dateRef.toFormat('dd/MM/yyyy')
           ) {
-            pdatetime.push(null);
-            pdatetime.push(null);
-            pdatetime.push(null);
-            pdatetime.push(null);
-            pdatetime.push(dateRef);
-
-            pbrl_ptax.push({ buy: null, sell: null });
-            pbrl_ptax.push({ buy: null, sell: null });
-            pbrl_ptax.push({ buy: null, sell: null });
-            pbrl_ptax.push({ buy: null, sell: null });
-            pbrl_ptax.push({
+            pbrl_ptax_final = {
+              dateTime: dateRef,
               buy: parseFloat(tds[2].rawText.replace(',', '.')),
               sell: parseFloat(tds[3].rawText.replace(',', '.')),
-            });
-
-            pusd_ptax.push({ buy: null, sell: null });
-            pusd_ptax.push({ buy: null, sell: null });
-            pusd_ptax.push({ buy: null, sell: null });
-            pusd_ptax.push({ buy: null, sell: null });
-            pusd_ptax.push({
+            };
+            pusd_ptax_final = {
+              dateTime: dateRef,
               buy: parseFloat(tds[4].rawText.replace(',', '.')),
               sell: parseFloat(tds[5].rawText.replace(',', '.')),
-            });
+            };
+
             foundDate = true;
             break;
           }
@@ -256,7 +286,7 @@ class PtaxBCB extends ReportLoaderCalendar {
               'dd/MM/yyyy',
             )} - Assett: ${asset.name} - No data to read`,
           );
-          return { inserted: -1, deleted: 0 };
+          return { inserted: 0, deleted: 0 }; // Allow to check for holidays and to reprocess
         }
       } else {
         throw new Error(
@@ -266,81 +296,104 @@ class PtaxBCB extends ReportLoaderCalendar {
     }
 
     let inserted = 0;
-    if (pbrl_ptax.length > 0 && pusd_ptax.length > 0) {
-      const res: IPTAX = {
-        date: dateRef,
-        currencyCode,
-        p1_datetime: pdatetime[0] || null,
-        pbrl_p1_buy: pbrl_ptax[0] ? pbrl_ptax[0].buy : null,
-        pbrl_p1_sell: pbrl_ptax[0] ? pbrl_ptax[0].sell : null,
-        pusd_p1_buy: pusd_ptax[0] ? pusd_ptax[0].buy : null,
-        pusd_p1_sell: pusd_ptax[0] ? pusd_ptax[0].sell : null,
 
-        p2_datetime: pdatetime[1] || null,
-        pbrl_p2_buy: pbrl_ptax[1] ? pbrl_ptax[1].buy : null,
-        pbrl_p2_sell: pbrl_ptax[1] ? pbrl_ptax[1].sell : null,
-        pusd_p2_buy: pusd_ptax[1] ? pusd_ptax[1].buy : null,
-        pusd_p2_sell: pusd_ptax[1] ? pusd_ptax[1].sell : null,
+    const res: IPTAX = {
+      date: dateRef,
+      currencyCode,
+      p1_datetime: pbrl_ptax_previews[0]
+        ? pbrl_ptax_previews[0].dateTime
+        : null,
+      pbrl_p1_buy: pbrl_ptax_previews[0] ? pbrl_ptax_previews[0].buy : null,
+      pbrl_p1_sell: pbrl_ptax_previews[0] ? pbrl_ptax_previews[0].sell : null,
+      pusd_p1_buy: pusd_ptax_previews[0] ? pusd_ptax_previews[0].buy : null,
+      pusd_p1_sell: pusd_ptax_previews[0] ? pusd_ptax_previews[0].sell : null,
 
-        p3_datetime: pdatetime[2] || null,
-        pbrl_p3_buy: pbrl_ptax[2] ? pbrl_ptax[2].buy : null,
-        pbrl_p3_sell: pbrl_ptax[2] ? pbrl_ptax[2].sell : null,
-        pusd_p3_buy: pusd_ptax[2] ? pusd_ptax[2].buy : null,
-        pusd_p3_sell: pusd_ptax[2] ? pusd_ptax[2].sell : null,
+      p2_datetime: pbrl_ptax_previews[1]
+        ? pbrl_ptax_previews[1].dateTime
+        : null,
+      pbrl_p2_buy: pbrl_ptax_previews[1] ? pbrl_ptax_previews[1].buy : null,
+      pbrl_p2_sell: pbrl_ptax_previews[1] ? pbrl_ptax_previews[1].sell : null,
+      pusd_p2_buy: pusd_ptax_previews[1] ? pusd_ptax_previews[1].buy : null,
+      pusd_p2_sell: pusd_ptax_previews[1] ? pusd_ptax_previews[1].sell : null,
 
-        p4_datetime: pdatetime[3] || null,
-        pbrl_p4_buy: pbrl_ptax[3] ? pbrl_ptax[3].buy : null,
-        pbrl_p4_sell: pbrl_ptax[3] ? pbrl_ptax[3].sell : null,
-        pusd_p4_buy: pusd_ptax[3] ? pusd_ptax[3].buy : null,
-        pusd_p4_sell: pusd_ptax[3] ? pusd_ptax[3].sell : null,
+      p3_datetime: pbrl_ptax_previews[2]
+        ? pbrl_ptax_previews[2].dateTime
+        : null,
+      pbrl_p3_buy: pbrl_ptax_previews[2] ? pbrl_ptax_previews[2].buy : null,
+      pbrl_p3_sell: pbrl_ptax_previews[2] ? pbrl_ptax_previews[2].sell : null,
+      pusd_p3_buy: pusd_ptax_previews[2] ? pusd_ptax_previews[2].buy : null,
+      pusd_p3_sell: pusd_ptax_previews[2] ? pusd_ptax_previews[2].sell : null,
 
-        ptax_datetime: pdatetime[4] || null,
-        pbrl_ptax_buy: pbrl_ptax[4] ? pbrl_ptax[4].buy : null,
-        pbrl_ptax_sell: pbrl_ptax[4] ? pbrl_ptax[4].sell : null,
-        pusd_ptax_buy: pusd_ptax[4] ? pusd_ptax[4].buy : null,
-        pusd_ptax_sell: pusd_ptax[4] ? pusd_ptax[4].sell : null,
-      };
+      p4_datetime: pbrl_ptax_previews[3]
+        ? pbrl_ptax_previews[3].dateTime
+        : null,
+      pbrl_p4_buy: pbrl_ptax_previews[3] ? pbrl_ptax_previews[3].buy : null,
+      pbrl_p4_sell: pbrl_ptax_previews[3] ? pbrl_ptax_previews[3].sell : null,
+      pusd_p4_buy: pusd_ptax_previews[3] ? pusd_ptax_previews[3].buy : null,
+      pusd_p4_sell: pusd_ptax_previews[3] ? pusd_ptax_previews[3].sell : null,
 
-      let sql = `SELECT * FROM "bcb-ptax" WHERE date=$1 AND "currency-code"=$2`;
+      ptax_datetime: pbrl_ptax_final ? pbrl_ptax_final.dateTime || null : null,
+      pbrl_ptax_buy: pbrl_ptax_final ? pbrl_ptax_final.buy || null : null,
+      pbrl_ptax_sell: pbrl_ptax_final ? pbrl_ptax_final.sell || null : null,
+      pusd_ptax_buy: pusd_ptax_final ? pusd_ptax_final.buy || null : null,
+      pusd_ptax_sell: pusd_ptax_final ? pusd_ptax_final.sell || null : null,
+    };
 
-      const qSel = await this.queryFactory.runQuery(sql, {
-        date: res.date.toJSDate(),
-        currencyCode: res.currencyCode,
-      });
+    let sql = `SELECT 
+    p1_datetime, pbrl_p1_buy, pbrl_p1_sell, pusd_p1_buy, pusd_p1_sell, 
+    p2_datetime, pbrl_p2_buy, pbrl_p2_sell, pusd_p2_buy, pusd_p2_sell, 
+    p3_datetime, pbrl_p3_buy, pbrl_p3_sell, pusd_p3_buy, pusd_p3_sell, 
+    p4_datetime, pbrl_p4_buy, pbrl_p4_sell, pusd_p4_buy, pusd_p4_sell, 
+    ptax_datetime, pbrl_ptax_buy, pbrl_ptax_sell, pusd_ptax_buy, pusd_ptax_sell 
+    FROM "bcb-ptax" WHERE date=$1 AND "currency-code"=$2`;
 
+    const qSel = await this.queryFactory.runQuery(sql, {
+      date: res.date.toJSDate(),
+      currencyCode: res.currencyCode,
+    });
+
+    if (
+      qSel &&
+      qSel.length > 0 &&
+      Number(qSel[0].pbrl_p1_buy) === Number(res.pbrl_p1_buy) &&
+      Number(qSel[0].pbrl_p1_sell) === Number(res.pbrl_p1_sell) &&
+      Number(qSel[0].pusd_p1_buy) === Number(res.pusd_p1_buy) &&
+      Number(qSel[0].pusd_p1_sell) === Number(res.pusd_p1_sell) &&
+      Number(qSel[0].pbrl_p2_buy) === Number(res.pbrl_p2_buy) &&
+      Number(qSel[0].pbrl_p2_sell) === Number(res.pbrl_p2_sell) &&
+      Number(qSel[0].pusd_p2_buy) === Number(res.pusd_p2_buy) &&
+      Number(qSel[0].pusd_p2_sell) === Number(res.pusd_p2_sell) &&
+      Number(qSel[0].pbrl_p3_buy) === Number(res.pbrl_p3_buy) &&
+      Number(qSel[0].pbrl_p3_sell) === Number(res.pbrl_p3_sell) &&
+      Number(qSel[0].pusd_p3_buy) === Number(res.pusd_p3_buy) &&
+      Number(qSel[0].pusd_p3_sell) === Number(res.pusd_p3_sell) &&
+      Number(qSel[0].pbrl_p4_buy) === Number(res.pbrl_p4_buy) &&
+      Number(qSel[0].pbrl_p4_sell) === Number(res.pbrl_p4_sell) &&
+      Number(qSel[0].pusd_p4_buy) === Number(res.pusd_p4_buy) &&
+      Number(qSel[0].pusd_p4_sell) === Number(res.pusd_p4_sell) &&
+      Number(qSel[0].pbrl_ptax_buy) === Number(res.pbrl_ptax_buy) &&
+      Number(qSel[0].pbrl_ptax_sell) === Number(res.pbrl_ptax_sell) &&
+      Number(qSel[0].pusd_ptax_buy) === Number(res.pusd_ptax_buy) &&
+      Number(qSel[0].pusd_ptax_sell) === Number(res.pusd_ptax_sell)
+    ) {
+      this.logger.silly(
+        `[${this.processName}] - DateRef: ${dateRef.toFormat(
+          'dd/MM/yyyy',
+        )} - Asset: ${asset.name} - No updated data to read`,
+      );
       if (
-        qSel &&
-        qSel.length > 0 &&
-        Number(qSel[0].pbrl_p1_buy) === Number(res.pbrl_p1_buy) &&
-        Number(qSel[0].pbrl_p1_sell) === Number(res.pbrl_p1_sell) &&
-        Number(qSel[0].pusd_p1_buy) === Number(res.pusd_p1_buy) &&
-        Number(qSel[0].pusd_p1_sell) === Number(res.pusd_p1_sell) &&
-        Number(qSel[0].pbrl_p2_buy) === Number(res.pbrl_p2_buy) &&
-        Number(qSel[0].pbrl_p2_sell) === Number(res.pbrl_p2_sell) &&
-        Number(qSel[0].pusd_p2_buy) === Number(res.pusd_p2_buy) &&
-        Number(qSel[0].pusd_p2_sell) === Number(res.pusd_p2_sell) &&
-        Number(qSel[0].pbrl_p3_buy) === Number(res.pbrl_p3_buy) &&
-        Number(qSel[0].pbrl_p3_sell) === Number(res.pbrl_p3_sell) &&
-        Number(qSel[0].pusd_p3_buy) === Number(res.pusd_p3_buy) &&
-        Number(qSel[0].pusd_p3_sell) === Number(res.pusd_p3_sell) &&
-        Number(qSel[0].pbrl_p4_buy) === Number(res.pbrl_p4_buy) &&
-        Number(qSel[0].pbrl_p4_sell) === Number(res.pbrl_p4_sell) &&
-        Number(qSel[0].pusd_p4_buy) === Number(res.pusd_p4_buy) &&
-        Number(qSel[0].pusd_p4_sell) === Number(res.pusd_p4_sell) &&
-        Number(qSel[0].pbrl_ptax_buy) === Number(res.pbrl_ptax_buy) &&
-        Number(qSel[0].pbrl_ptax_sell) === Number(res.pbrl_ptax_sell) &&
-        Number(qSel[0].pusd_ptax_buy) === Number(res.pusd_ptax_buy) &&
-        Number(qSel[0].pusd_ptax_sell) === Number(res.pusd_ptax_sell)
-      ) {
-        this.logger.silly(
-          `[${this.processName}] - DateRef: ${dateRef.toFormat(
-            'dd/MM/yyyy',
-          )} - Asset: ${asset.name} - No updated data to read`,
-        );
-        return { inserted: -1, deleted: 0 };
-      }
+        lastTaskOfDay &&
+        (!res.pbrl_ptax_buy ||
+          res.pbrl_ptax_buy <= 0 ||
+          !res.pbrl_ptax_sell ||
+          res.pbrl_ptax_sell <= 0)
+      )
+        return { inserted: 0, deleted: 0 }; // allow reprocess even outside schedule time frame
 
-      sql = `INSERT INTO "bcb-ptax" (date, "currency-code", 
+      return { inserted: -1, deleted: 0 };
+    }
+
+    sql = `INSERT INTO "bcb-ptax" (date, "currency-code", 
       p1_datetime,
       pbrl_p1_buy, pbrl_p1_sell, 
       pusd_p1_buy, pusd_p1_sell, 
@@ -377,70 +430,84 @@ class PtaxBCB extends ReportLoaderCalendar {
       pusd_ptax_buy=$26, pusd_ptax_sell=$27,
       last_update=$28`;
 
-      await this.queryFactory.runQuery(sql, {
-        date: res.date.toJSDate(),
-        currencyCode: res.currencyCode,
-        p1_datetime: qSel[0]
+    await this.queryFactory.runQuery(sql, {
+      date: res.date.toJSDate(),
+      currencyCode: res.currencyCode,
+      p1_datetime:
+        qSel.length > 0 && qSel[0].p1_datetime
           ? qSel[0].p1_datetime
-          : res.p1_datetime
+          : res.p1_datetime && res.p1_datetime.isValid
           ? res.p1_datetime.toJSDate()
           : null,
-        pbrl_p1_buy: res.pbrl_p1_buy,
-        pbrl_p1_sell: res.pbrl_p1_sell,
-        pusd_p1_buy: res.pusd_p1_buy,
-        pusd_p1_sell: res.pusd_p1_sell,
+      pbrl_p1_buy: res.pbrl_p1_buy,
+      pbrl_p1_sell: res.pbrl_p1_sell,
+      pusd_p1_buy: res.pusd_p1_buy,
+      pusd_p1_sell: res.pusd_p1_sell,
 
-        p2_datetime: qSel[0]
+      p2_datetime:
+        qSel.length > 0 && qSel[0].p2_datetime
           ? qSel[0].p2_datetime
-          : res.p2_datetime
+          : res.p2_datetime && res.p2_datetime.isValid
           ? res.p2_datetime.toJSDate()
           : null,
-        pbrl_p2_buy: res.pbrl_p2_buy,
-        pbrl_p2_sell: res.pbrl_p2_sell,
-        pusd_p2_buy: res.pusd_p2_buy,
-        pusd_p2_sell: res.pusd_p2_sell,
+      pbrl_p2_buy: res.pbrl_p2_buy,
+      pbrl_p2_sell: res.pbrl_p2_sell,
+      pusd_p2_buy: res.pusd_p2_buy,
+      pusd_p2_sell: res.pusd_p2_sell,
 
-        p3_datetime: qSel[0]
+      p3_datetime:
+        qSel.length > 0 && qSel[0].p3_datetime
           ? qSel[0].p3_datetime
-          : res.p3_datetime
+          : res.p3_datetime && res.p3_datetime.isValid
           ? res.p3_datetime.toJSDate()
           : null,
-        pbrl_p3_buy: res.pbrl_p3_buy,
-        pbrl_p3_sell: res.pbrl_p3_sell,
-        pusd_p3_buy: res.pusd_p3_buy,
-        pusd_p3_sell: res.pusd_p3_sell,
+      pbrl_p3_buy: res.pbrl_p3_buy,
+      pbrl_p3_sell: res.pbrl_p3_sell,
+      pusd_p3_buy: res.pusd_p3_buy,
+      pusd_p3_sell: res.pusd_p3_sell,
 
-        p4_datetime: qSel[0]
+      p4_datetime:
+        qSel.length > 0 && qSel[0].p4_datetime
           ? qSel[0].p4_datetime
-          : res.p4_datetime
+          : res.p4_datetime && res.p4_datetime.isValid
           ? res.p4_datetime.toJSDate()
           : null,
-        pbrl_p4_buy: res.pbrl_p4_buy,
-        pbrl_p4_sell: res.pbrl_p4_sell,
-        pusd_p4_buy: res.pusd_p4_buy,
-        pusd_p4_sell: res.pusd_p4_sell,
+      pbrl_p4_buy: res.pbrl_p4_buy,
+      pbrl_p4_sell: res.pbrl_p4_sell,
+      pusd_p4_buy: res.pusd_p4_buy,
+      pusd_p4_sell: res.pusd_p4_sell,
 
-        ptax_datetime: qSel[0]
+      ptax_datetime:
+        qSel.length > 0 && qSel[0].ptax_datetime
           ? qSel[0].ptax_datetime
-          : res.ptax_datetime
+          : res.ptax_datetime && res.ptax_datetime.isValid
           ? res.ptax_datetime.toJSDate()
           : null,
-        pbrl_ptax_buy: res.pbrl_ptax_buy,
-        pbrl_ptax_sell: res.pbrl_ptax_sell,
-        pusd_ptax_buy: res.pusd_ptax_buy,
-        pusd_ptax_sell: res.pusd_ptax_sell,
-        last_update: new Date(),
-      });
-      inserted++;
+      pbrl_ptax_buy: res.pbrl_ptax_buy,
+      pbrl_ptax_sell: res.pbrl_ptax_sell,
+      pusd_ptax_buy: res.pusd_ptax_buy,
+      pusd_ptax_sell: res.pusd_ptax_sell,
+      last_update: new Date(),
+    });
+    inserted++;
 
-      if (
-        asset.currencyCode === TCurrencyCode.USD &&
-        res.date.startOf('day').toMillis() ===
-          DateTime.now().startOf('day').toMillis()
-      ) {
-        this.throwBotEvent('DOL_PTAX', { d: dateRef.toJSDate(), q: 2 });
-      }
+    if (
+      asset.currencyCode === TCurrencyCode.USD &&
+      res.date.startOf('day').toMillis() ===
+        DateTime.now().startOf('day').toMillis()
+    ) {
+      this.throwBotEvent('DOL_PTAX', { d: dateRef.toJSDate(), q: 2 });
     }
+
+    if (
+      lastTaskOfDay &&
+      (!res.pbrl_ptax_buy ||
+        res.pbrl_ptax_buy <= 0 ||
+        !res.pbrl_ptax_sell ||
+        res.pbrl_ptax_sell <= 0)
+    )
+      return { inserted: 0, deleted: 0 }; // allow reprocess even outside schedule time frame
+
     return { inserted, deleted: 0 };
   }
 

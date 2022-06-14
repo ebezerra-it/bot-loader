@@ -1,5 +1,4 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
-import { TCurrencyCode } from '../../controllers/tcountry';
 
 export default class tblBcbPtax1626314657024 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -15,9 +14,7 @@ export default class tblBcbPtax1626314657024 implements MigrationInterface {
           },
           {
             name: 'currency-code',
-            type: 'enum',
-            enum: Object.keys(TCurrencyCode),
-            enumName: 'TCurrencyCode',
+            type: 'text',
             isNullable: false,
             isPrimary: true,
           },

@@ -122,6 +122,8 @@ class spotExchangeB3 extends ReportLoaderCalendar {
   }
 
   async performQuery(params: { dateRef: DateTime }): Promise<any> {
+    // Interessante:
+    // https://www.b3.com.br/pt_br/market-data-e-indices/servicos-de-dados/market-data/consultas/clearing-de-cambio/indicadores/taxas-de-cambio-praticadas/
     return (
       await axios({
         method: 'post',

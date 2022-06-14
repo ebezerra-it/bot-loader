@@ -24,6 +24,8 @@ import TimesNSalesB3 from './loaders/timesAndSalesB3';
 import ChartLoaderCME from './loaders/chartLoaderCME';
 import AssetsExpiryCME from './loaders/assetsExpiryCME';
 import AssetsExpiryB3 from './loaders/assetsExpiryB3';
+import ChartLoaderTradingView from './loaders/chartLoaderTradingView';
+import ChartLoaderYahoo from './loaders/chartLoaderYahoo';
 
 interface ICronJob {
   name: string;
@@ -246,6 +248,32 @@ class TaskManager extends EventEmitter {
     });
 
     schedules.push({
+      name: 'ChartLoaderTradingView',
+      class: new ChartLoaderTradingView(
+        'ChartLoaderTradingView',
+        this.logger.getChildLogger({ name: 'ChartLoaderTradingView' }),
+        this.queryfactory,
+        TExchange.B3,
+      ),
+      cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
+      dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
+    });
+
+    schedules.push({
+      name: 'ChartLoaderYahoo',
+      class: new ChartLoaderYahoo(
+        'ChartLoaderYahoo',
+        this.logger.getChildLogger({ name: 'ChartLoaderYahoo' }),
+        this.queryfactory,
+        TExchange.NASDAQ,
+      ),
+      cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.NASDAQ,
+      dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
+    });
+
+    schedules.push({
       name: 'AssetsExpiryCME',
       class: new AssetsExpiryCME(
         'AssetsExpiryCME',
@@ -437,6 +465,7 @@ class TaskManager extends EventEmitter {
               dateRef,
               dateMatch: DateTime.fromJSDate(proc.datematch),
               restoreTable,
+              lastTaskOfDay: true,
             });
 
             try {
@@ -489,11 +518,20 @@ class TaskManager extends EventEmitter {
     const dateMatch = DateTime.fromJSDate(loaderjob!.job.lastDate());
     let dateRef = dateMatch;
     let dtIni = dateMatch;
+
+    const cron = parseExpression(loaderjob!.cron, {
+      currentDate: dateRef.toJSDate(),
+    });
+
+    const lastTaskOfDay =
+      loaderjob!.dtRefAdj === 0
+        ? DateTime.fromJSDate(cron.next().toDate())
+            .startOf('day')
+            .toMillis() !== DateTime.now().startOf('day').toMillis()
+        : undefined;
+
     for (let i = 0; i < Math.abs(loaderjob!.dtRefAdj); i++) {
       if (loaderjob!.dtRefAdj > 0) {
-        const cron = parseExpression(loaderjob!.cron, {
-          currentDate: dateRef.toJSDate(),
-        });
         while (
           dtIni.startOf('day').toMillis() === dateRef.startOf('day').toMillis()
         ) {
@@ -501,9 +539,6 @@ class TaskManager extends EventEmitter {
         }
         dateRef = dateRef.startOf('day');
       } else if (loaderjob!.dtRefAdj < 0) {
-        const cron = parseExpression(loaderjob!.cron, {
-          currentDate: dateRef.toJSDate(),
-        });
         while (
           dtIni.startOf('day').toMillis() === dateRef.startOf('day').toMillis()
         ) {
@@ -541,6 +576,7 @@ class TaskManager extends EventEmitter {
     const task = new Task(loaderjob!.name, loaderjob!.reportLoader, {
       dateRef,
       dateMatch,
+      lastTaskOfDay,
     });
     try {
       loaderjob.instancesRunning++;

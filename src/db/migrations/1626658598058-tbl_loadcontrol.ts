@@ -1,5 +1,4 @@
 import { MigrationInterface, QueryRunner, Table } from 'typeorm';
-import { TLoadStatus } from '../../controllers/task';
 
 export default class tblLoadcontrol1626658598058 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -27,11 +26,8 @@ export default class tblLoadcontrol1626658598058 implements MigrationInterface {
           },
           {
             name: 'status',
-            type: 'enum',
-            enum: Object.keys(TLoadStatus),
-            enumName: 'TLoadStatus',
+            type: 'text',
             isNullable: false,
-            default: `'${TLoadStatus.DONE}'`,
           },
           {
             name: 'result',

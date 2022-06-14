@@ -3,49 +3,159 @@
     Author: t.me/edubbulhoes
 }
 input
-    Future(True);
+    IndVolume(False);
+    ShowDayMinus(1);
+    ShowType(0); // 0-VWAP; 1-HIGH; 2-LOW; 3-CLOSE
+    ShowProjections(6);
+    ProjectionMultiplier(1.0);
 var 
     dt: Array[0..<%= qte %>] of Integer;
-    fD2Spot: Array[0..<%= qte %>] of Float;
-    fD1Spot: Array[0..<%= qte %>] of Float;
-    fD0Spot: Array[0..<%= qte %>] of Float;
+    fD2Vwap: Array[0..<%= qte %>] of Float;
+    fD1Vwap: Array[0..<%= qte %>] of Float;
+    fD0Vwap: Array[0..<%= qte %>] of Float;
 
-    fD2Fut: Array[0..<%= qte %>] of Float;
-    fD1Fut: Array[0..<%= qte %>] of Float;
-    fD0Fut: Array[0..<%= qte %>] of Float;
+    fD2High: Array[0..<%= qte %>] of Float;
+    fD1High: Array[0..<%= qte %>] of Float;
+    fD0High: Array[0..<%= qte %>] of Float;
 
-    qte, i: Integer;
+    fD2Low: Array[0..<%= qte %>] of Float;
+    fD1Low: Array[0..<%= qte %>] of Float;
+    fD0Low: Array[0..<%= qte %>] of Float;
+
+    fD2Close: Array[0..<%= qte %>] of Float;
+    fD1Close: Array[0..<%= qte %>] of Float;
+    fD0Close: Array[0..<%= qte %>] of Float;
+
+    fD2Band: Array[0..<%= qte %>] of Float;
+    fD1Band: Array[0..<%= qte %>] of Float;
+    fD0Band: Array[0..<%= qte %>] of Float;
+
+    fD2Vol: Array[0..<%= qte %>] of Integer;
+    fD1Vol: Array[0..<%= qte %>] of Integer;
+    fD0Vol: Array[0..<%= qte %>] of Integer;
+
+    fRefValue, fRefBand: Float;
+
+    qte, i, j, k, qttyProj: Integer;
+    projMulti: Float;
 begin
 <% for(var i=0; i<qte; i++) { %>
     dt[<%= i %>] := <%= spot[i].date %>;
-    fD2Spot[<%= i %>] := <%= spot[i].spot_d2 %>;
-    fD1Spot[<%= i %>] := <%= spot[i].spot_d1 %>;
-    fD0Spot[<%= i %>] := <%= spot[i].spot_d0 %>;
+    fD2Vwap[<%= i %>] := <%= spot[i].vwap_d2 %>;
+    fD1Vwap[<%= i %>] := <%= spot[i].vwap_d1 %>;
+    fD0Vwap[<%= i %>] := <%= spot[i].vwap_d0 %>;
 
-    fD2Fut[<%= i %>] := <%= spot[i].fut_d2 %>;
-    fD1Fut[<%= i %>] := <%= spot[i].fut_d1 %>;
-    fD0Fut[<%= i %>] := <%= spot[i].fut_d0 %>;
+    fD2High[<%= i %>] := <%= spot[i].high_d2 %>;
+    fD1High[<%= i %>] := <%= spot[i].high_d1 %>;
+    fD0High[<%= i %>] := <%= spot[i].high_d0 %>;
+
+    fD2Low[<%= i %>] := <%= spot[i].low_d2 %>;
+    fD1Low[<%= i %>] := <%= spot[i].low_d1 %>;
+    fD0Low[<%= i %>] := <%= spot[i].low_d0 %>;
+
+    fD2Close[<%= i %>] := <%= spot[i].close_d2 %>;
+    fD1Close[<%= i %>] := <%= spot[i].close_d1 %>;
+    fD0Close[<%= i %>] := <%= spot[i].close_d0 %>;
+
+    fD2Band[<%= i %>] := <%= spot[i].band_d2 %>;
+    fD1Band[<%= i %>] := <%= spot[i].band_d1 %>;
+    fD0Band[<%= i %>] := <%= spot[i].band_d0 %>;
+
+    fD2Vol[<%= i %>] := <%= spot[i].vol_d2 %>;
+    fD1Vol[<%= i %>] := <%= spot[i].vol_d1 %>;
+    fD0Vol[<%= i %>] := <%= spot[i].vol_d0 %>;
 
 <% } %>
     qte := <%= qte %>;
 
     if (date >= dt[0]) then
     begin
+        qttyProj := ShowProjections;
+        if (qttyProj > 10) then qttyProj := 10; // MAX PROJECTIONS
+        if (ProjectionMultiplier <= 0) then projMulti := 1.0
+        else projMulti := ProjectionMultiplier;
+
         for i:=0 to qte do
         begin
             if (date = dt[i]) then
             begin
-                if (Future) then
+                if (IndVolume) then
                 begin
-                    plot(fD2Fut[i]);
-                    plot2(fD1Fut[i]);
-                    plot3(fD0Fut[i]);
+                    plot(fD0Vol[i]);
+                    plot2(fD1Vol[i]);
+                    plot3(fD2Vol[i]);
                 end
                 else
                 begin
-                    plot(fD2Spot[i]);
-                    plot2(fD1Spot[i]);
-                    plot3(fD0Spot[i]);
+                    if (ShowDayMinus=0) then
+                    begin
+                        fRefBand := fD0Band[i];
+
+                        if (ShowType=0) then fRefValue := fD0Vwap[i]
+                        else if (ShowType=1) then fRefValue := fD0High[i]
+                        else if (ShowType=2) then fRefValue := fD0Low[i]
+                        else if (ShowType=3) then fRefValue := fD0Close[i]
+                        else
+                        begin
+                            fRefValue := 0;
+                            fRefBand := 0;
+                        end;
+                    end
+                    else if (ShowDayMinus=1) then
+                    begin
+                        fRefBand := fD1Band[i];
+
+                        if (ShowType=0) then fRefValue := fD1Vwap[i]
+                        else if (ShowType=1) then fRefValue := fD1High[i]
+                        else if (ShowType=2) then fRefValue := fD1Low[i]
+                        else if (ShowType=3) then fRefValue := fD1Close[i]
+                        else
+                        begin
+                            fRefValue := 0;
+                            fRefBand := 0;
+                        end;
+                    end
+                    else if (ShowDayMinus=2) then
+                    begin
+                        fRefBand := fD2Band[i];
+
+                        if (ShowType=0) then fRefValue := fD2Vwap[i]
+                        else if (ShowType=1) then fRefValue := fD2High[i]
+                        else if (ShowType=2) then fRefValue := fD2Low[i]
+                        else if (ShowType=3) then fRefValue := fD2Close[i]
+                        else
+                        begin
+                            fRefValue := 0;
+                            fRefBand := 0;
+                        end;
+                    end
+                    else
+                    begin
+                        fRefValue := 0;
+                        fRefBand := 0;
+                    end;
+
+                    if ((fRefValue > 0) And (fRefBand > 0)) then
+                    begin
+                        setPlotColor(1, RGB(102,178,255));
+                        plotN(1, fRefValue);
+                        if (qttyProj > 0) then
+                        begin
+                            k := 2;
+                            for j := 1 to qttyProj do
+                            begin
+                                setPlotColor(k, RGB(153,255,153));
+                                plotN(k, fRefValue + projMulti*j*fRefBand);
+                                k := k + 1;
+                            end;
+                            for j := 1 to qttyProj do
+                            begin
+                                setPlotColor(k, RGB(255,153,153));
+                                plotN(k, fRefValue - ProjMulti*j*fRefBand);
+                                k := k + 1;
+                            end;
+                        end;
+                    end;
                 end;
             end;
         end;

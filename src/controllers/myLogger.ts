@@ -108,6 +108,8 @@ class MyLogger extends Logger {
           ),
         )
       );
+
+      // MIN_LOG_LEVEL = 'info'
       if (
         idMinLevelBotLog <
         <TLogLevelId>tsLogLevels.indexOf(<TLogLevelName>'info')
