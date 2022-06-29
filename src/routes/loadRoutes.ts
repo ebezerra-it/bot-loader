@@ -305,7 +305,12 @@ export default class LiveRoutes extends BaseRoutes {
         }
         if (bQuerySpot) {
           await new QuerySPOT(this.bot).process(
-            { dateRef: DateTime.now() },
+            {
+              dateRef: DateTime.now(),
+              dateRefFRP: true,
+              spotProjectionsQtty: 6,
+              spotProjectionsMultiplier: 1,
+            },
             false,
           );
         }

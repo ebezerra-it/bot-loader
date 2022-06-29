@@ -77,6 +77,9 @@ export default class BotRoutes extends BaseRoutes {
             await new QuerySPOT(this.bot).process(
               {
                 dateRef,
+                dateRefFRP: true,
+                spotProjectionsQtty: 6,
+                spotProjectionsMultiplier: 1,
               },
               true,
             );

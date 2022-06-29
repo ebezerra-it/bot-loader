@@ -1,3 +1,4 @@
+/* eslint-disable no-nested-ternary */
 /* eslint-disable camelcase */
 /* eslint-disable no-restricted-syntax */
 import { DateTime } from 'luxon';
@@ -251,18 +252,65 @@ export default class QuerySPOT extends Query {
 
       if (!aFRP0) {
         // consider frp0 d0 = frp1 d-1 if exists. Otherwise, frp0 d-1
-        qFRP0 = await this.queryFactory.runQuery(
+        /* qFRP0 = await this.queryFactory.runQuery(
           `SELECT date, COALESCE(q.pmo, 0) frp0 FROM (
           SELECT "timestamp-open"::DATE date, MAX(high) h, MIN(low) l, (MAX(high) + MIN(low))/2 pmo FROM "b3-ts-summary" bts WHERE asset = 'FRP0' AND "timestamp-open"::DATE=ANY($1) GROUP BY "timestamp-open"::DATE
           UNION
           SELECT * FROM 
-          (SELECT $2::DATE date, MAX(high) h, MIN(low) l, (MAX(high) + MIN(low))/2 pmo FROM "b3-ts-summary" bts WHERE asset = 'FRP1' AND "timestamp-open"::DATE<=$2::DATE GROUP BY "timestamp-open"::DATE ORDER BY "timestamp-open"::DATE DESC LIMIT 1) q) q
+          (SELECT $2::DATE date, MAX(high) h, MIN(low) l, (MAX(high) + MIN(low))/2 pmo FROM "b3-ts-summary" bts WHERE asset = 'FRP1' AND "timestamp-open"::DATE<$2::DATE GROUP BY "timestamp-open"::DATE ORDER BY "timestamp-open"::DATE DESC LIMIT 1) q) q
           ORDER BY date DESC`,
           {
             spotDates: [...qSpot.map((s: any) => s.date)],
             dateRef: dateRef.toJSDate(),
           },
+        ); */
+        qFRP0 = await this.queryFactory.runQuery(
+          `SELECT date, COALESCE(q.vwap, 0) frp0 FROM 
+          (SELECT "timestamp-open"::DATE date, MAX(high) h, MIN(low) l, (MAX(high) + MIN(low))/2 pmo, (stddev_combine(volume, vwap, sigma)).mean vwap FROM "b3-ts-summary" bts WHERE asset = 'FRP0' AND "timestamp-open"::DATE=ANY($1) GROUP BY "timestamp-open"::DATE) q
+          ORDER BY date DESC`,
+          {
+            spotDates: [...qSpot.map((s: any) => s.date)],
+          },
         );
+        let qFRP1 = await this.queryFactory.runQuery(
+          `SELECT date, COALESCE(q.vwap, 0) frp1 FROM 
+          (SELECT "timestamp-open"::DATE date, MAX(high) h, MIN(low) l, (MAX(high) + MIN(low))/2 pmo, (stddev_combine(volume, vwap, sigma)).mean vwap FROM "b3-ts-summary" bts WHERE asset = 'FRP1' AND "timestamp-open"::DATE<$1::DATE GROUP BY "timestamp-open"::DATE ORDER BY "timestamp-open"::DATE DESC LIMIT 1) q
+          ORDER BY date DESC`,
+          {
+            dateRef: dateRef.toJSDate(),
+          },
+        );
+        if (
+          qFRP1 &&
+          qFRP1.length > 0 &&
+          DateTime.fromJSDate(qFRP1[0].date).startOf('day').toMillis() ===
+            (
+              await ReportLoaderCalendar.subTradeDays(
+                this.queryFactory,
+                dateRef,
+                1,
+                TCountryCode.BR,
+              )
+            )
+              .startOf('day')
+              .toMillis()
+        )
+          qFRP0.push({ date: dateRef.toJSDate(), frp0: qFRP1[0].frp1 });
+        else if (
+          dateRef.startOf('day').toMillis() <
+          DateTime.now().startOf('day').toMillis()
+        ) {
+          qFRP1 = await this.queryFactory.runQuery(
+            `SELECT date, COALESCE(q.open, 0) frp1 FROM 
+            (SELECT "timestamp-open"::DATE date, open FROM "b3-ts-summary" bts WHERE asset = 'FRP0' AND "timestamp-open"::DATE=$1::DATE ORDER BY "timestamp-open" ASC LIMIT 1) q
+            ORDER BY date DESC`,
+            {
+              dateRef: dateRef.toJSDate(),
+            },
+          );
+          if (qFRP1 && qFRP1.length > 0)
+            qFRP0.push({ date: dateRef.toJSDate(), frp0: qFRP1[0].frp1 });
+        }
 
         aFRP0 =
           qFRP0 &&
@@ -278,12 +326,16 @@ export default class QuerySPOT extends Query {
               DateTime.fromJSDate(f.date).toMillis() ===
               dateRef.startOf('day').toMillis(),
           )
-            ? qFRP0.map(q => {
-                return {
-                  date: DateTime.fromJSDate(q.date),
-                  frp0: +Number(q.frp0).toFixed(2),
-                };
-              })
+            ? qFRP0
+                .map(q => {
+                  return {
+                    date: DateTime.fromJSDate(q.date),
+                    frp0: +Number(q.frp0).toFixed(2),
+                  };
+                })
+                .sort((a, b) =>
+                  a.date > b.date ? -1 : a.date < b.date ? 1 : 0,
+                )
             : undefined;
       }
     } else {
@@ -425,7 +477,7 @@ export default class QuerySPOT extends Query {
       spot,
       frp0,
       frp0_multiplier: multiplier,
-      negative: negative.sort(),
+      negative: negative.sort().reverse(),
     };
   }
 

@@ -138,7 +138,7 @@ abstract class ReportLoaderCalendar extends ReportLoader {
       .startOf('day')
       .diff(date2.startOf('day'), 'days').days;
     const increment = diffDays / Math.abs(diffDays);
-    for (let i = 1; i !== diffDays; i += increment) {
+    for (let i = 0; i <= diffDays; i += increment) {
       const d = date1.plus({ days: i * increment });
       if (await this.isTradeDay(queryFactory, d, countryCode)) countTradeDays++;
     }

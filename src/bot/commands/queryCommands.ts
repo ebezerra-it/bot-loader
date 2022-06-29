@@ -7,7 +7,10 @@ import BaseCommands from './baseBotCommands';
 import TelegramBot, { Message, TUserType } from '../telegramBot';
 import ReportLoaderCalendar from '../../controllers/reportLoaderCalendar';
 import { TCountryCode } from '../../controllers/tcountry';
-import QueryPTAX, { IQueryPTAX } from '../../controllers/queries/queryPTAX';
+import QueryPTAX, {
+  IQueryPTAX,
+  IPTAX,
+} from '../../controllers/queries/queryPTAX';
 import QuerySPOT, {
   ISpotSettleDate,
 } from '../../controllers/queries/querySPOT';
@@ -21,6 +24,7 @@ import QueryOptions, {
 import QueryVolatility, {
   TAssetType,
 } from '../../controllers/queries/queryVolatility';
+import QueryFRP0, { TContractType } from '../../controllers/queries/queryFRP0';
 
 const MSG_INVALID_DATE = `Invalid reference date or date is weekend/holiday: $1`;
 const MSG_INVALID_DATES_ORDER = `Invalid dates: date from can't be after date to.`;
@@ -38,6 +42,22 @@ class QueryCommands extends BaseCommands {
         /^\/query\sPTAX(\s\d\d\/\d\d\/\d\d\d\d)?(\s[0-9]+)?$/gi,
       ),
       procedure: this.queryPtax,
+    });
+
+    this.botCommands.push({
+      name: 'queryPtaxD1',
+      regEx: new RegExp(
+        /^\/query\sPTAXD1(\s\d\d\/\d\d\/\d\d\d\d)?(\s\d+)?(\s\d+\.?\d*)?$/gi,
+      ),
+      procedure: this.queryPtaxD1,
+    });
+
+    this.botCommands.push({
+      name: 'queryFRP0',
+      regEx: new RegExp(
+        /^\/query\sFRP0(\sCURRENT|\sNEXT)?(\s\d\d\/\d\d\/\d\d\d\d)?(\s\d\d\/\d\d\/\d\d\d\d)?$/gi,
+      ),
+      procedure: this.queryFRP0,
     });
 
     this.botCommands.push({
@@ -87,9 +107,17 @@ class QueryCommands extends BaseCommands {
     });
 
     this.botCommands.push({
+      name: 'profitPtaxD1',
+      regEx: new RegExp(
+        /^\/profit\sPTAXD1\s(\d\d\/\d\d\/\d\d\d\d)(\s\d\d\/\d\d\/\d\d\d\d)?/gi,
+      ),
+      procedure: this.profitPtaxD1,
+    });
+
+    this.botCommands.push({
       name: 'profitSpot',
       regEx: new RegExp(
-        /^\/profit\sSPOT\s(\d\d\/\d\d\/\d\d\d\d)(\s\d\d\/\d\d\/\d\d\d\d)?(\s(\d+))?(\s(\d+\.?\d*))?$/gi,
+        /^\/profit\sSPOT\s(\d\d\/\d\d\/\d\d\d\d)(\s\d\d\/\d\d\/\d\d\d\d)?$/gi,
       ),
       procedure: this.profitSpot,
     });
@@ -166,6 +194,73 @@ class QueryCommands extends BaseCommands {
     await new QueryPTAX(this.bot).process({
       dateRef,
       priorDays,
+      chatId: user.chatId,
+      messageId: msg.message_id,
+    });
+  }
+
+  private async queryPtaxD1(
+    msg: Message,
+    match?: RegExpExecArray | null,
+  ): Promise<void> {
+    // ^\/query\sPTAXD1(\s\d\d\/\d\d\/\d\d\d\d)?(\s\d+)?(\s\d+\.?\d*)?$
+    const { cmdAllowed, user } = await this.checkAuth(
+      msg,
+      TUserType.DEFAULT,
+      true,
+    );
+    if (!cmdAllowed || !user) return;
+
+    const args = match!.map(a => (a ? a.trim().toUpperCase() : a));
+    args.splice(0, 1);
+
+    const dateRef = args[0]
+      ? DateTime.fromFormat(args[0], 'dd/MM/yyyy')
+      : DateTime.now();
+    if (
+      !(await ReportLoaderCalendar.isTradeDay(
+        this.bot.queryFactory,
+        dateRef,
+        TCountryCode.BR,
+      ))
+    ) {
+      await this.bot.sendMessage(
+        msg.chat.id,
+        MSG_INVALID_DATE.replace(/\$1/g, dateRef.toFormat('dd/MM/yyyy')),
+        {
+          reply_to_message_id: msg.message_id,
+        },
+      );
+      return;
+    }
+    if (args[1] && (Number(args[1]) <= 0 || Number(args[1]) > 20)) {
+      await this.bot.sendMessage(
+        msg.chat.id,
+        `Projections quantity must be between 1 and 20.`,
+        {
+          reply_to_message_id: msg.message_id,
+        },
+      );
+      return;
+    }
+    const projectionsQtty = !args[1] ? 6 : Number(args[1]);
+
+    if (args[2] && (Number(args[2]) < 0.1 || Number(args[2]) > 5)) {
+      await this.bot.sendMessage(
+        msg.chat.id,
+        `Projections multiplier must be between 0.1 and 5.0`,
+        {
+          reply_to_message_id: msg.message_id,
+        },
+      );
+      return;
+    }
+    const projectionsMultiplier = !args[2] ? 1.0 : Number(args[2]);
+
+    await new QueryPTAX(this.bot).process({
+      dateRef,
+      projectionsQtty,
+      projectionsMultiplier,
       chatId: user.chatId,
       messageId: msg.message_id,
     });
@@ -268,6 +363,62 @@ class QueryCommands extends BaseCommands {
     });
   }
 
+  private async queryFRP0(
+    msg: Message,
+    match?: RegExpExecArray | null,
+  ): Promise<void> {
+    // /query\sFRP0(\sCURRENT|\sNEXT)?(\s\d\d\/\d\d\/\d\d\d\d)?(\s\d\d\/\d\d\/\d\d\d\d)?$/gi
+    const { cmdAllowed, user } = await this.checkAuth(
+      msg,
+      TUserType.DEFAULT,
+      true,
+    );
+    if (!cmdAllowed || !user) return;
+
+    const args = match!.map(a => (a ? a.trim().toUpperCase() : undefined));
+    args.splice(0, 1);
+
+    const contractType =
+      !args[0] || args[0] === TContractType.CURRENT
+        ? TContractType.CURRENT
+        : TContractType.NEXT;
+
+    const dateFrom = args[1]
+      ? DateTime.fromFormat(args[1], 'dd/MM/yyyy')
+      : DateTime.now();
+
+    if (dateFrom.weekday === 6 || dateFrom.weekday === 7) {
+      await this.bot.sendMessage(
+        msg.chat.id,
+        MSG_INVALID_DATE.replace(/\$1/g, dateFrom.toFormat('dd/MM/yyyy')),
+        {
+          reply_to_message_id: msg.message_id,
+        },
+      );
+      return;
+    }
+
+    const dateTo = args[2]
+      ? DateTime.fromFormat(args[2], 'dd/MM/yyyy')
+      : dateFrom;
+
+    if (dateFrom.startOf('day').toMillis() > dateTo.startOf('day').toMillis()) {
+      await this.bot.sendMessage(msg.chat.id, MSG_INVALID_DATES_ORDER, {
+        reply_to_message_id: msg.message_id,
+      });
+      return;
+    }
+
+    await new QueryFRP0(this.bot).process({
+      dateFrom,
+      dateTo,
+      contractType,
+      prefD1FRP1: true,
+      chatId: user.chatId,
+      messageId: msg.message_id,
+    });
+  }
+
   private async querySpot(
     msg: Message,
     match?: RegExpExecArray | null,
@@ -313,18 +464,18 @@ class QueryCommands extends BaseCommands {
       return;
     }
 
-    if (args[1] && (Number(args[1]) <= 0 || Number(args[1]) > 9)) {
+    if (args[1] && (Number(args[1]) <= 0 || Number(args[1]) > 20)) {
       await this.bot.sendMessage(
         msg.chat.id,
-        `Spot projections must be between 1 and 9.`,
+        `Spot projections must be between 1 and 20.`,
         {
           reply_to_message_id: msg.message_id,
         },
       );
       return;
     }
-
     const spotProjectionsQtty = !args[1] ? 6 : Number(args[1]);
+
     if (args[3] && (Number(args[3]) < 0.1 || Number(args[3]) > 5)) {
       await this.bot.sendMessage(
         msg.chat.id,
@@ -335,8 +486,8 @@ class QueryCommands extends BaseCommands {
       );
       return;
     }
-
     const spotProjectionsMultiplier = !args[3] ? 1.0 : Number(args[3]);
+
     await new QuerySPOT(this.bot).process({
       dateRef,
       dateRefFRP: true,
@@ -634,7 +785,7 @@ class QueryCommands extends BaseCommands {
       const aPTAX: IQueryPTAX[] = [];
       const qPTAX: IQueryPTAX | undefined = await new QueryPTAX(
         this.bot,
-      ).calculate(dateRef, Number(priorDays));
+      ).calculateAverage(dateRef, Number(priorDays));
       if (qPTAX) aPTAX.push(qPTAX);
 
       while (
@@ -692,6 +843,187 @@ class QueryCommands extends BaseCommands {
         },
       );
     }
+  }
+
+  private async profitPtaxD1(
+    msg: Message,
+    match?: RegExpExecArray | null,
+  ): Promise<void> {
+    const { cmdAllowed, user } = await this.checkAuth(
+      msg,
+      TUserType.DEFAULT,
+      true,
+    );
+    if (!cmdAllowed || !user) return;
+
+    const args = match!.map(a => (a ? a.trim().toUpperCase() : a));
+    args.splice(0, 1);
+
+    const dateFrom = DateTime.fromFormat(args[0], 'dd/MM/yyyy');
+    if (
+      !(await ReportLoaderCalendar.isTradeDay(
+        this.bot.queryFactory,
+        dateFrom,
+        TCountryCode.BR,
+      ))
+    ) {
+      await this.bot.sendMessage(
+        msg.chat.id,
+        MSG_INVALID_DATE.replace(/\$1/g, dateFrom.toFormat('dd/MM/yyyy')),
+        {
+          reply_to_message_id: msg.message_id,
+        },
+      );
+      return;
+    }
+
+    const dateTo = args[1]
+      ? DateTime.fromFormat(args[1], 'dd/MM/yyyy')
+      : DateTime.now();
+
+    if (
+      !(await ReportLoaderCalendar.isTradeDay(
+        this.bot.queryFactory,
+        dateTo,
+        TCountryCode.BR,
+      ))
+    ) {
+      await this.bot.sendMessage(
+        msg.chat.id,
+        MSG_INVALID_DATE.replace(/\$1/g, dateTo.toFormat('dd/MM/yyyy')),
+        {
+          reply_to_message_id: msg.message_id,
+        },
+      );
+      return;
+    }
+
+    if (dateFrom.startOf('day') > dateTo.startOf('day')) {
+      await this.bot.sendMessage(msg.chat.id, MSG_INVALID_DATES_ORDER, {
+        reply_to_message_id: msg.message_id,
+      });
+      return;
+    }
+
+    if (
+      (await ReportLoaderCalendar.differenceInTradeDays(
+        this.bot.queryFactory,
+        dateFrom,
+        dateTo,
+        TCountryCode.BR,
+      )) > parseInt(process.env.BOT_QUERY_MAXIMUM_DATES_RANGE || '260')
+    ) {
+      await this.bot.sendMessage(msg.chat.id, MSG_INVALID_DATES_RANGE, {
+        reply_to_message_id: msg.message_id,
+      });
+      return;
+    }
+
+    let dateRef = dateFrom;
+    const aPTAX: any[] = [];
+    while (dateRef <= dateTo) {
+      const qPTAX: IPTAX | undefined = await new QueryPTAX(this.bot).getD1PTAX(
+        dateRef,
+      );
+
+      if (qPTAX) {
+        const qHighLow = await this.bot.queryFactory.runQuery(
+          `SELECT MAX(high) AS high, MIN(low) AS low FROM "b3-ts-summary" WHERE asset = ANY($1) AND "timestamp-open"::DATE=$2`,
+          {
+            asset: [
+              `DOL${qPTAX.frp0.contract.code}`,
+              `WDO${qPTAX.frp0.contract.code}`,
+            ],
+            dateref: qPTAX.date.toJSDate(),
+          },
+        );
+        aPTAX.push({
+          ...qPTAX,
+          high:
+            qHighLow && qHighLow.length > 0
+              ? qHighLow.map((q: any) => +Number(q.high).toFixed(2))
+              : 0,
+          low:
+            qHighLow && qHighLow.length > 0
+              ? qHighLow.map((q: any) => +Number(q.low).toFixed(2))
+              : 0,
+        });
+      }
+
+      dateRef = dateRef.plus({ days: 1 });
+      while (
+        dateRef.weekday === 6 ||
+        dateRef.weekday === 7 ||
+        !(await ReportLoaderCalendar.isTradeDay(
+          this.bot.queryFactory,
+          dateRef,
+          TCountryCode.BR,
+        ))
+      ) {
+        dateRef = dateRef.plus({ days: 1 });
+      }
+    }
+
+    const msgHeader = `PROFIT PTAX - Date From: ${dateFrom.toFormat(
+      'dd/MM/yyyy',
+    )} - Date To: ${dateTo.toFormat('dd/MM/yyyy')}\n`;
+    if (aPTAX.length === 0) {
+      this.bot.sendMessage(
+        msg.chat.id,
+        `${msgHeader}Not enought data.`,
+
+        { reply_to_message_id: msg.message_id },
+      );
+    }
+
+    const profit = await ejs.renderFile(
+      `${path.resolve(`${__dirname}/../templates`)}/profitPTAXD1.ejs`,
+      {
+        qte: aPTAX.length,
+        ptax: aPTAX.map(p => {
+          return {
+            date: `1${p.date.toFormat('yyMMdd')}`,
+            ptax: p.ptax,
+            band1: p.frp0.traded
+              ? p.frp0.traded.vwap
+              : p.frp0.calculated.close_d1 && p.frp0.calculated.close_d1 > 0
+              ? p.frp0.calculated.close_d1
+              : p.frp0.calculated.settle_d1 && p.frp0.calculated.settle_d1 > 0
+              ? p.frp0.calculated.settle_d1
+              : 0,
+            band2:
+              p.frp0Next && p.frp0Next.calculated
+                ? p.frp0Next.calculated.close_d1 &&
+                  p.frp0Next.calculated.close_d1 > 0
+                  ? p.frp0Next.calculated.close_d1
+                  : p.frp0Next.calculated.settle_d1 &&
+                    p.frp0Next.calculated.settle_d1 > 0
+                  ? p.frp0Next.calculated.settle_d1
+                  : 0
+                : 0,
+            high: p.high,
+            low: p.low,
+          };
+        }),
+      },
+    );
+
+    const filename = `profitPTAXD1_${
+      msg.from?.username
+    }_${DateTime.now().toFormat('yyyyMMddHHmmss')}.pas`;
+    const stream = Buffer.from(profit, 'utf-8');
+    await this.bot.sendDocument(
+      msg.chat.id,
+      stream,
+      {
+        caption: msgHeader,
+        reply_to_message_id: msg.message_id,
+      },
+      {
+        filename,
+        contentType: 'text/plain',
+      },
+    );
   }
 
   private async profitSpot(

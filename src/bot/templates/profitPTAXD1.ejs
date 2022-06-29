@@ -1,0 +1,78 @@
+{
+    PTAX D1 backtest indicator
+    Author: t.me/edubbulhoes
+}
+input
+    ShowProjections(6);
+    ProjectionMultiplier(1.0);
+    ShowRelevantProjectionsOnly(False);
+    ShowBand1(true);
+var 
+    dt: Array[0..<%= qte %>] of Integer;
+    fPTAX: Array[0..<%= qte %>] of Float;
+    fBand1: Array[0..<%= qte %>] of Float;
+    fBand2: Array[0..<%= qte %>] of Float;
+    fHigh: Array[0..<%= qte %>] of Float;
+    fLow: Array[0..<%= qte %>] of Float;
+
+    fRefValue, fRefBand: Float;
+
+    qte, i, j, k, qttyProj: Integer;
+    projMulti: Float;
+begin
+<% for(var i=0; i<qte; i++) { %>
+    dt[<%= i %>] := <%= ptax[i].date %>;
+    fPTAX[<%= i %>] := <%= ptax[i].ptax %>;
+    fBand1[<%= i %>] := <%= ptax[i].band1 %>;
+    fBand2[<%= i %>] := <%= ptax[i].band2 %>;
+    fHigh[<%= i %>] := <%= ptax[i].high %>;
+    fLow[<%= i %>] := <%= ptax[i].low %>;
+<% } %>
+    qte := <%= qte %>;
+
+    if (date >= dt[0]) then
+    begin
+        qttyProj := ShowProjections;
+        if (qttyProj > 10) then qttyProj := 10; // MAX PROJECTIONS
+        if (ProjectionMultiplier <= 0) then projMulti := 1.0
+        else projMulti := ProjectionMultiplier;
+
+        for i:=0 to qte do
+        begin
+            if (date = dt[i]) then
+            begin
+                fRefValue := fPTAX[i];
+                if (ShowBand1) then fRefBand := fBand1[i]
+                else fRefBand := fBand2[i];
+
+                if ((fRefValue > 0) And (fRefBand > 0)) then
+                begin
+                    setPlotColor(1, RGB(102,178,255));
+                    plotN(1, fRefValue);
+                    if (qttyProj > 0) then
+                    begin
+                        k := 2;
+                        for j := 1 to qttyProj do
+                        begin
+                            if ((ShowRelevantProjectionsOnly) And ((fHigh[i] = 0) Or ((fRefValue + projMulti*j*fRefBand) <= fHigh[i]))) then
+                            begin
+                                setPlotColor(k, RGB(153,255,153));
+                                plotN(k, fRefValue + projMulti*j*fRefBand);
+                                k := k + 1;
+                            end;
+                        end;
+                        for j := 1 to qttyProj do
+                        begin
+                            if ((ShowRelevantProjectionsOnly) And ((fLow[i] = 0) Or ((fRefValue - projMulti*j*fRefBand) >= fLow[i]))) then
+                            begin
+                                setPlotColor(k, RGB(255,153,153));
+                                plotN(k, fRefValue - ProjMulti*j*fRefBand);
+                                k := k + 1;
+                            end;
+                        end;
+                    end;
+                end;
+            end;
+        end;
+    end;   
+end;
