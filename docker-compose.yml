@@ -58,6 +58,17 @@ services:
       - 9229:9229 #Node debug port
     volumes: 
       - myoraculum-postgres_data:/var/lib/postgresql/data
+    networks:
+      myoraculum_network:
 
 volumes:
   myoraculum-postgres_data:
+
+networks:
+  myoraculum_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${DOCKER_NETWORK_SUBNET}
+          gateway: ${DOCKER_NETWORK_GATEWAY}

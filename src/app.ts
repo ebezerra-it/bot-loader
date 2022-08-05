@@ -136,7 +136,10 @@ let loader: Loader;
     );
 
     await new Promise((resolve, reject) =>
-      apiBot.listen(port).once('listening', resolve).once('error', reject),
+      apiBot
+        .listen(port, '0.0.0.0')
+        .once('listening', resolve)
+        .once('error', reject),
     );
     logger.info(`[SERVICE STARTED] - BOT started and running on port ${port}`);
 

@@ -18,40 +18,56 @@ export default abstract class BaseRoutes {
 
   public abstract getRouter(): Promise<Router>;
 
-  blockRemoteCall(req: Request, res: Response, next: NextFunction): void {
-    const remoteIP = req.ip.match(/\d*\.\d*\.\d*\.\d*/)![0];
-    if (remoteIP === '127.0.0.1' || remoteIP === 'localhost') next();
-    else {
-      this.logger.warn(
-        `[SECURITY WARN] BOT route blocked remote call from IP: ${req.ip} to route: ${req.originalUrl}`,
-      );
-      this.bot.sendMessageToUsers(
-        TUserType.OWNER,
-        `[SECURITY WARN] BOT route blocked remote call from IP: ${req.ip} to route: ${req.originalUrl}`,
-        {},
-      );
-    }
-  }
-
-  blockUnauthCall(req: Request, res: Response, next: NextFunction): void {
+  public blockRemoteCall = (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): void => {
     const remoteIP = req.ip.match(/\d*\.\d*\.\d*\.\d*/)![0];
     if (
-      ((remoteIP === '127.0.0.1' ||
-        remoteIP === 'localhost' ||
-        remoteIP === '172.18.0.1') &&
-        process.env.NODE_ENV === 'DEV') ||
-      (remoteIP === process.env.LIVELOAD_ALLOWED_IP && !remoteIP)
+      remoteIP === '127.0.0.1' ||
+      remoteIP === 'localhost' ||
+      (remoteIP === process.env.DOCKER_NETWORK_GATEWAY && !!remoteIP)
     )
       next();
     else {
-      this.logger.warn(
-        `[SECURITY WARN] BOT route blocked remote call from IP: ${req.ip} to route: ${req.originalUrl}`,
+      const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+      this.logger.silly(
+        `[SECURITY WARN] BOT route blocked remote call from IP: ${req.ip} to route: ${url}`,
       );
       this.bot.sendMessageToUsers(
         TUserType.OWNER,
-        `[SECURITY WARN] BOT route blocked remote call from IP: ${req.ip} to route: ${req.originalUrl}`,
+        `[SECURITY WARN] BOT route blocked remote call from IP: ${req.ip} to route: ${url}`,
         {},
       );
+      res.end();
     }
-  }
+  };
+
+  public blockUnauthCall = (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): void => {
+    const remoteIP = req.ip.match(/\d*\.\d*\.\d*\.\d*/)![0];
+    if (
+      ((remoteIP === '127.0.0.1' || remoteIP === 'localhost') &&
+        process.env.NODE_ENV === 'DEV') ||
+      (remoteIP === process.env.DOCKER_NETWORK_GATEWAY && !!remoteIP) ||
+      (remoteIP === process.env.LIVELOAD_ALLOWED_IP && !!remoteIP)
+    )
+      next();
+    else {
+      const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+      this.logger.silly(
+        `[SECURITY WARN] BOT route blocked remote call from IP: ${req.ip} to route: ${url}`,
+      );
+      this.bot.sendMessageToUsers(
+        TUserType.OWNER,
+        `[SECURITY WARN] BOT route blocked remote call from IP: ${req.ip} to route: ${url}`,
+        {},
+      );
+      res.end();
+    }
+  };
 }
