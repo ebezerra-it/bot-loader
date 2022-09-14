@@ -22,17 +22,17 @@ export default class tblB3Brokers1659364044873 implements MigrationInterface {
             name: 'type',
             type: 'text',
             isNullable: false,
-            default: 'O', // F - Foreign; N - National; O - Other
+            default: `'O'`, // F - Foreign; N - National; O - Other
           },
           {
             name: 'exchange-bmf',
             type: 'boolean',
-            default: false,
+            default: 'false',
           },
           {
             name: 'exchange-bov',
             type: 'boolean',
-            default: false,
+            default: 'false',
           },
         ],
       }),

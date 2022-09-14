@@ -56,10 +56,22 @@ export default class firstdataload1652845346716 implements MigrationInterface {
     await GlobalParameters.init(queryFactory, true);
 
     // download and restore last db backup, if exists
-    const query = CloudFileManager.getTsGoogleDrive()
+    const cloudPool = CloudFileManager.getCloudPool();
+    const cloud = cloudPool[cloudPool.length - 1];
+    const backupFolder = process.env.BACKUP_DB_CLOUD_FOLDER || 'DB Backup';
+    const backupFolderId = await CloudFileManager.getFolderId(
+      cloud,
+      backupFolder,
+    );
+    if (!backupFolderId)
+      throw new Error(
+        `[Migration - FirstDataLoad] loadDBBackupData - Missing backup folder in cloud: ${backupFolder}`,
+      );
+
+    const query = cloudPool[cloudPool.length - 1]
       .query()
       .setFileOnly()
-      .inFolder(process.env.BACKUP_DB_CLOUD_FOLDER || '')
+      .inFolder(backupFolderId)
       .setPageSize(300)
       .setOrderBy('name');
     if (query.hasNextPage()) {
@@ -138,8 +150,7 @@ export default class firstdataload1652845346716 implements MigrationInterface {
     );
 
     const pathProfitZip = path.join(pathProfitDir, 'MP_FIRST_DATA_LOAD.zip');
-    await CloudFileManager.downloadFileCloud(
-      CloudFileManager.getTsGoogleDrive(),
+    await CloudFileManager.downloadFileCloudPool(
       pathProfitZip,
       process.env.REMOTE_PROFITDATA_FOLDER || '',
     );

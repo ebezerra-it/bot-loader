@@ -2,6 +2,7 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable import/newline-after-import */
 /* eslint-disable import/first */
+/* 
 import dotenv from 'dotenv';
 import { Logger } from 'tslog';
 import path from 'path';
@@ -90,3 +91,4 @@ import CloudFileManager from './controllers/cloudFileManager';
   process.kill(process.pid, 'SIGINT');
   process.exit(0);
 })();
+ */

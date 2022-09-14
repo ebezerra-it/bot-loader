@@ -10,7 +10,9 @@ services:
     
     container_name: myoraculum-botloader
     volumes: 
-      - ./:/app/myoraculum-botloader
+      - ./:/app/myoraculum/botloader
+      - ./pipe2host:${VM_CONT_HOST2PIPE_DIR}
+      - ./vmscreenshots:${VM_CONT_SCREENSHOTS_DIR}
     
     command:
       - /bin/bash
@@ -66,6 +68,7 @@ volumes:
 
 networks:
   myoraculum_network:
+    name: myoraculum-network
     driver: bridge
     ipam:
       driver: default

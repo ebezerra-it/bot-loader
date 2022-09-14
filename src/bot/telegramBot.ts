@@ -11,6 +11,7 @@ import { Logger } from 'tslog';
 import { QueryFactory } from '../db/queryFactory';
 import ServiceAdmBotCommands from './commands/serviceAdmBotCommands';
 import QueryCommands from './commands/queryCommands';
+import VmCommands from './commands/vmCommands';
 
 enum TUserType {
   UNKNOWN = -1,
@@ -134,6 +135,7 @@ class TelegramBot extends Telegram {
 
     new ServiceAdmBotCommands(this).loadCommands();
     new QueryCommands(this).loadCommands();
+    new VmCommands(this).loadCommands();
   }
 
   public async sendMessageToUsers(

@@ -12,6 +12,8 @@ services:
     container_name: myoraculum-botloader
     volumes: 
       - myoraculum-botloader_log:/app/myoraculum-botloader/log
+      - ${VM_HOST_HOST2PIPE_DIR}:${VM_CONT_HOST2PIPE_DIR}
+      - ${VM_HOST_SCREENSHOTS_DIR}:${VM_CONT_SCREENSHOTS_DIR}
     
     restart: "no" #unless-stopped
 
@@ -52,7 +54,19 @@ services:
       - ${PROFIT_API_PORT}:${PROFIT_API_PORT}
     volumes: 
       - myoraculum-postgres_data:/var/lib/postgresql/data
+    networks:
+      myoraculum_network:
 
 volumes:
   myoraculum-postgres_data:
   myoraculum-botloader_log:
+
+networks:
+  myoraculum_network:
+    name: myoraculum-network
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${DOCKER_NETWORK_SUBNET}
+          gateway: ${DOCKER_NETWORK_GATEWAY}

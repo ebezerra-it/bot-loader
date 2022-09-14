@@ -4,50 +4,110 @@ import path from 'path';
 import fs from 'fs';
 
 export default class CloudFileManager {
-  public gdrive: TsGoogleDrive;
+  public cloudPool: TsGoogleDrive[];
 
-  constructor(oldCloud = false) {
-    this.gdrive = oldCloud
-      ? CloudFileManager.getOldTsGoogleDrive()
-      : CloudFileManager.getTsGoogleDrive();
+  constructor() {
+    this.cloudPool = [];
+    for (let i = 0; i < Number(process.env.GDRIVE_CLOUD_POOL_SIZE); i++) {
+      if (
+        process.env[`GDRIVE_CLOUD_CLIENT_EMAIL_${i}`] &&
+        process.env[`GDRIVE_CLOUD_PRIVATE_KEY_${i}`]
+      ) {
+        this.cloudPool.push(
+          new TsGoogleDrive({
+            credentials: {
+              client_email: process.env[`GDRIVE_CLOUD_CLIENT_EMAIL_${i}`],
+              private_key: String(
+                process.env[`GDRIVE_CLOUD_PRIVATE_KEY_${i}`],
+              ).replace(/\\n/g, '\n'),
+            },
+          }),
+        );
+      }
+    }
   }
 
-  public static getTsGoogleDrive(): TsGoogleDrive {
-    return new TsGoogleDrive({
-      credentials: {
-        client_email: process.env.GDRIVE_CLIENT_EMAIL,
-        private_key: String(process.env.GDRIVE_PRIVATE_KEY).replace(
-          /\\n/g,
-          '\n',
-        ),
-      },
-    });
+  public static getCloudPool(): TsGoogleDrive[] {
+    const cloudPool: TsGoogleDrive[] = [];
+
+    for (let i = 1; i <= Number(process.env.GDRIVE_CLOUD_POOL_SIZE); i++) {
+      if (
+        process.env[`GDRIVE_CLOUD_CLIENT_EMAIL_${i}`] &&
+        process.env[`GDRIVE_CLOUD_PRIVATE_KEY_${i}`]
+      ) {
+        cloudPool.push(
+          new TsGoogleDrive({
+            credentials: {
+              client_email: process.env[`GDRIVE_CLOUD_CLIENT_EMAIL_${i}`],
+              private_key: String(
+                process.env[`GDRIVE_CLOUD_PRIVATE_KEY_${i}`],
+              ).replace(/\\n/g, '\n'),
+            },
+          }),
+        );
+      }
+    }
+    return cloudPool;
   }
 
-  public static getOldTsGoogleDrive(): TsGoogleDrive {
-    return new TsGoogleDrive({
-      credentials: {
-        client_email: process.env.OLD_GDRIVE_CLIENT_EMAIL,
-        private_key: String(process.env.OLD_GDRIVE_PRIVATE_KEY).replace(
-          /\\n/g,
-          '\n',
-        ),
-      },
-    });
+  public static async getFolderId(
+    cloud: TsGoogleDrive,
+    folderName: string,
+  ): Promise<string | undefined> {
+    const query = cloud.query().setFolderOnly().setNameEqual(folderName);
+    if (query.hasNextPage()) {
+      const files = await query.run();
+      if (files.length > 0) return files.length > 0 ? files[0].id : undefined;
+    }
+    return undefined;
+  }
+
+  public static async downloadFileCloudPool(
+    pathFile: string,
+    remoteFolderName: string,
+  ): Promise<boolean> {
+    const cloudPool = CloudFileManager.getCloudPool();
+    for await (const cloud of cloudPool) {
+      const remoteFolderId = await CloudFileManager.getFolderId(
+        cloud,
+        remoteFolderName,
+      );
+      if (remoteFolderId) {
+        const fileExists = await CloudFileManager.fileExistsInCloudPool(
+          pathFile,
+          remoteFolderName,
+        );
+        if (fileExists) {
+          const file = await fileExists.cloud.getFile(fileExists.fileId);
+          if (file) {
+            fs.writeFileSync(pathFile, await file.download());
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  public async downloadFileCloudPool(
+    pathFile: string,
+    remoteFolderName: string,
+  ): Promise<boolean> {
+    return CloudFileManager.downloadFileCloudPool(pathFile, remoteFolderName);
   }
 
   public static async downloadFileCloud(
-    gdrive: TsGoogleDrive,
+    cloud: TsGoogleDrive,
     pathFile: string,
     remoteFolderId: string,
   ): Promise<boolean> {
-    const remoteFolder = await gdrive.getFile(remoteFolderId);
+    const remoteFolder = await cloud.getFile(remoteFolderId);
     if (!remoteFolder)
       throw new Error(
         `Download file from cloud failed - Remote folder Id not found: ${remoteFolderId}`,
       );
 
-    const query = gdrive
+    const query = cloud
       .query()
       .setFileOnly()
       .inFolder(remoteFolderId)
@@ -74,21 +134,73 @@ export default class CloudFileManager {
     return false;
   }
 
-  public async downloadFileCloud(
+  public static async uploadFileCloudPool(
     pathFile: string,
-    remoteFolderId: string,
-  ): Promise<boolean> {
-    return CloudFileManager.downloadFileCloud(
-      this.gdrive,
+    remoteFolderName: string,
+    deleteIfExists = false,
+    uploadIfExists = false,
+  ): Promise<void> {
+    let fileExists:
+      | {
+          cloud: TsGoogleDrive;
+          fileId: string;
+        }
+      | undefined = await CloudFileManager.fileExistsInCloudPool(
+      pathFile,
+      remoteFolderName,
+    );
+
+    if (deleteIfExists) {
+      if (fileExists) {
+        const file = await fileExists.cloud.getFile(fileExists.fileId);
+        if (file) {
+          await file.delete();
+          fileExists = undefined; // File no longer exists
+        }
+      }
+    }
+
+    if (!!fileExists && !uploadIfExists) return;
+
+    const cloudPool: TsGoogleDrive[] = CloudFileManager.getCloudPool();
+    const cloud: TsGoogleDrive = cloudPool[cloudPool.length - 1];
+    const remoteFolderId = await CloudFileManager.getFolderId(
+      cloud,
+      remoteFolderName,
+    );
+
+    if (!remoteFolderId)
+      throw new Error(
+        `uploadFileCloudPool() - RemoteFolder: ${remoteFolderName} not found`,
+      );
+
+    await CloudFileManager.uploadFileCloud(
+      cloud,
       pathFile,
       remoteFolderId,
+      deleteIfExists,
+      uploadIfExists,
+    );
+  }
+
+  public async uploadFileCloudPool(
+    pathFile: string,
+    remoteFolderName: string,
+    deleteIfExists = false,
+    uploadIfExists = false,
+  ): Promise<void> {
+    return CloudFileManager.uploadFileCloudPool(
+      pathFile,
+      remoteFolderName,
+      deleteIfExists,
+      uploadIfExists,
     );
   }
 
   public static async uploadFileCloud(
     gdrive: TsGoogleDrive,
     pathFile: string,
-    remoteFolder: string,
+    remoteFolderId: string,
     deleteIfExists = false,
     uploadIfExists = false,
   ): Promise<void> {
@@ -96,7 +208,7 @@ export default class CloudFileManager {
     const query = gdrive
       .query()
       .setFileOnly()
-      .inFolder(remoteFolder)
+      .inFolder(remoteFolderId)
       .setNameEqual(path.basename(pathFile));
     while (query.hasNextPage()) {
       const files = await query.run();
@@ -108,51 +220,84 @@ export default class CloudFileManager {
     }
 
     if (!found || uploadIfExists || deleteIfExists) {
-      await gdrive.upload(pathFile, {
-        parent: remoteFolder,
-      });
+      let uploaded = false;
+      try {
+        await gdrive.upload(pathFile, {
+          parent: remoteFolderId,
+        });
+        uploaded = true;
+      } finally {
+        if (!uploaded) {
+          // eslint-disable-next-line no-unsafe-finally
+          throw new Error(
+            `uploadFileCloud() - Unable to upload file ${path.basename(
+              pathFile,
+            )} to cloud`,
+          );
+        }
+      }
     }
   }
 
   public async uploadFileCloud(
     pathFile: string,
-    remoteFolder: string,
+    remoteFolderId: string,
     deleteIfExists = false,
     uploadIfExists = false,
   ): Promise<void> {
     return CloudFileManager.uploadFileCloud(
-      this.gdrive,
+      this.cloudPool[this.cloudPool.length - 1],
       pathFile,
-      remoteFolder,
+      remoteFolderId,
       deleteIfExists,
       uploadIfExists,
     );
   }
 
+  public static async fileExistsInCloudPool(
+    filename: string,
+    remoteFolderName: string,
+  ): Promise<{ cloud: TsGoogleDrive; fileId: string } | undefined> {
+    const cloudPool: TsGoogleDrive[] = CloudFileManager.getCloudPool();
+    for await (const cloud of cloudPool) {
+      const remoteFolderId = await CloudFileManager.getFolderId(
+        cloud,
+        remoteFolderName,
+      );
+      if (remoteFolderId) {
+        const fileId = await CloudFileManager.fileExistsInCloud(
+          cloud,
+          filename,
+          remoteFolderId,
+        );
+        if (fileId) return { cloud, fileId };
+      }
+    }
+    return undefined;
+  }
+
+  public async fileExistsInCloudPool(
+    filename: string,
+    remoteFolderName: string,
+  ): Promise<{ cloud: TsGoogleDrive; fileId: string } | undefined> {
+    return CloudFileManager.fileExistsInCloudPool(filename, remoteFolderName);
+  }
+
   public static async fileExistsInCloud(
     gdrive: TsGoogleDrive,
     filename: string,
-    remoteFolder: string,
-  ): Promise<boolean> {
+    remoteFolderId: string,
+  ): Promise<string | undefined> {
     const query = gdrive
       .query()
       .setFileOnly()
-      .inFolder(remoteFolder)
+      .inFolder(remoteFolderId)
       .setNameEqual(path.basename(filename));
 
-    if (query.hasNextPage()) return (await query.run()).length > 0;
-
-    return false;
-  }
-
-  public async fileExistsInCloud(
-    filename: string,
-    remoteFolder: string,
-  ): Promise<boolean> {
-    return CloudFileManager.fileExistsInCloud(
-      this.gdrive,
-      filename,
-      remoteFolder,
-    );
+    if (query.hasNextPage()) {
+      const files = await query.run();
+      return files.length > 0 ? files[0].id : undefined;
+    }
+    return undefined;
   }
 }

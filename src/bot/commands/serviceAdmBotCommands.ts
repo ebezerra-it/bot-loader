@@ -1167,8 +1167,7 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       process.env.BACKUP_FILE_PREFIX || ''
     }${dateRef.toFormat('yyyyMMdd')}.zip`;
     if (
-      !(await CloudFileManager.fileExistsInCloud(
-        CloudFileManager.getTsGoogleDrive(),
+      !(await CloudFileManager.fileExistsInCloudPool(
         bkpfilename,
         process.env.BACKUP_DB_CLOUD_FOLDER || '',
       ))

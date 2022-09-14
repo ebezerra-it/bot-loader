@@ -9,4 +9,5 @@ RUN  apt-get update \
      && apt-get install -y google-chrome-stable postgresql-client-14 pigz \
      && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app/myoraculum-botloader
+WORKDIR /app/myoraculum/botloader
+VOLUME /app/myoraculum/

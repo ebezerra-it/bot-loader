@@ -23,7 +23,7 @@ export default class BackupRestoreDB extends ReportLoader {
       }`,
     );
 
-    const cloud = new CloudFileManager();
+    const cloudManager = new CloudFileManager();
 
     const backupPathFileName = path.join(
       __dirname,
@@ -38,7 +38,7 @@ export default class BackupRestoreDB extends ReportLoader {
     if (params.restoreTable) {
       await this.retry({
         action: 'BKP_CLOUD_DOWNLOAD',
-        cloud,
+        cloudManager,
         pathFileName: backupPathFileName,
       });
 
@@ -83,7 +83,7 @@ export default class BackupRestoreDB extends ReportLoader {
 
       if (dependencyList && dependencyList.length > 0) {
         const qProcess = await this.queryFactory.runQuery(
-          `SELECT process FROM "loadcontrol" WHERE "date-ref"=$1 AND status=$2`,
+          `SELECT DISTINCT process FROM "loadcontrol" WHERE "date-ref"::DATE=$1::DATE AND status=$2`,
           {
             dateRef: params.dateRef.toJSDate(),
             status: TLoadStatus.DONE,
@@ -95,7 +95,7 @@ export default class BackupRestoreDB extends ReportLoader {
 
         dependencyList.forEach(d => {
           if (
-            !qProcess.find((p: any) => String(p.process).toUpperCase() !== d)
+            !qProcess.find((p: any) => String(p.process).toUpperCase() === d)
           ) {
             allDependenciesDone = false;
             waitingProcess.push(d);
@@ -110,6 +110,7 @@ export default class BackupRestoreDB extends ReportLoader {
               ', ',
             )}.`,
           );
+          return { inserted: 0, deleted: 0 };
         }
       }
     }
@@ -117,18 +118,18 @@ export default class BackupRestoreDB extends ReportLoader {
     await BackupRestoreDB.backupDataBase(backupPathFileName);
     await this.retry({
       action: 'BKP_CLOUD_UPLOAD',
-      cloud,
+      cloudManager,
       pathFileName: backupPathFileName,
     });
     if (fs.existsSync(backupPathFileName)) fs.unlinkSync(backupPathFileName);
-    await this.cleanCloudBackupFiles(cloud, params.dateRef);
+    await this.cleanCloudBackupFiles(cloudManager, params.dateRef);
 
     const pathLogFileName = await this.compactLogFile(params.dateRef);
 
     if (pathLogFileName) {
       await this.retry({
         action: 'LOG_CLOUD_UPLOAD',
-        cloud,
+        cloudManager,
         pathFileName: pathLogFileName,
       });
       if (fs.existsSync(pathLogFileName)) fs.unlinkSync(pathLogFileName);
@@ -149,6 +150,12 @@ export default class BackupRestoreDB extends ReportLoader {
     );
 
     process.env.PGPASSWORD = undefined;
+
+    if (!fs.existsSync(backupPathFileName)) {
+      throw new Error(
+        `[BackupDatabase] PG_DUMP process didn't create backup zip file: ${backupPathFileName}`,
+      );
+    }
   }
 
   public static async restoreDataBase(
@@ -176,12 +183,12 @@ export default class BackupRestoreDB extends ReportLoader {
 
   public async performQuery(params: {
     action: string;
-    cloud: CloudFileManager;
+    cloudManager: CloudFileManager;
     pathFileName: string;
   }): Promise<boolean> {
     if (params.action === 'BKP_CLOUD_DOWNLOAD') {
       if (
-        !(await params.cloud.fileExistsInCloud(
+        !(await params.cloudManager.fileExistsInCloudPool(
           path.basename(params.pathFileName),
           process.env.BACKUP_DB_CLOUD_FOLDER || '',
         ))
@@ -190,14 +197,14 @@ export default class BackupRestoreDB extends ReportLoader {
         return false;
       }
 
-      await params.cloud.downloadFileCloud(
+      await params.cloudManager.downloadFileCloudPool(
         params.pathFileName,
         process.env.BACKUP_DB_CLOUD_FOLDER || '',
       );
       return true;
     }
     if (params.action === 'BKP_CLOUD_UPLOAD') {
-      await params.cloud.uploadFileCloud(
+      await params.cloudManager.uploadFileCloudPool(
         params.pathFileName,
         process.env.BACKUP_DB_CLOUD_FOLDER || '',
         false,
@@ -206,7 +213,7 @@ export default class BackupRestoreDB extends ReportLoader {
       return true;
     }
     if (params.action === 'LOG_CLOUD_UPLOAD') {
-      await params.cloud.uploadFileCloud(
+      await params.cloudManager.uploadFileCloudPool(
         params.pathFileName,
         process.env.BACKUP_LOG_CLOUD_FOLDER || '',
         true,
@@ -281,19 +288,30 @@ export default class BackupRestoreDB extends ReportLoader {
   }
 
   private async cleanCloudBackupFiles(
-    cloud: CloudFileManager,
+    cloudManager: CloudFileManager,
     dateRef: DateTime,
   ): Promise<number> {
-    const backupFolder = process.env.BACKUP_DB_CLOUD_FOLDER || '';
+    const backupFolder = process.env.BACKUP_DB_CLOUD_FOLDER || 'DB Backup';
+
     const zipFilename = `${
       process.env.BACKUP_FILE_PREFIX || ''
     }${dateRef.toFormat('yyyyMMdd')}.zip`;
 
+    const cloud = cloudManager.cloudPool[cloudManager.cloudPool.length - 1];
+    const backupFolderId = await CloudFileManager.getFolderId(
+      cloud,
+      backupFolder,
+    );
+    if (!backupFolderId)
+      throw new Error(
+        `[${this.processName}] CleanCloudBackupfiles() - Missing backup folder in cloud: ${backupFolder}`,
+      );
+
     let found = false;
-    let query = cloud.gdrive
+    let query = cloud
       .query()
       .setFileOnly()
-      .inFolder(backupFolder)
+      .inFolder(backupFolderId)
       .setNameEqual(zipFilename)
       .setOrderBy('name');
 
@@ -305,7 +323,7 @@ export default class BackupRestoreDB extends ReportLoader {
     let deleted = 0;
     if (found) {
       const filesToDelete: { dtFile: DateTime; file: any }[] = [];
-      query = cloud.gdrive.query().setFileOnly().inFolder(backupFolder);
+      query = cloud.query().setFileOnly().inFolder(backupFolderId);
 
       while (query.hasNextPage()) {
         const files = await query.run();

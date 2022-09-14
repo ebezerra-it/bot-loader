@@ -13,7 +13,7 @@ fi
 echo "[MYORACULUM-BOTLOADER] Generating build - App version $APP_VERSION"
 yarn build
 unset DOCKER_HOST
-docker context use production
+docker context use prod-vds #production
 echo "[MYORACULUM-BOTLOADER] Stopping and removing docker container and image"
 docker-compose -f PROD_docker-compose.yml --env-file ./prod.env rm --force --stop $SERVICE
 echo "[MYORACULUM-BOTLOADER] Building docker image and starting service"

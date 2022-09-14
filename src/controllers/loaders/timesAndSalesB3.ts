@@ -92,8 +92,7 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
       csvPathFilename,
       zipFilename,
     );
-    await CloudFileManager.uploadFileCloud(
-      CloudFileManager.getTsGoogleDrive(),
+    await CloudFileManager.uploadFileCloudPool(
       zipPathFilename,
       process.env.B3_TIMESNSALES_REMOTE_FOLDER || '',
       false,
@@ -176,8 +175,7 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
           }] performQuery() - Missing parameters: ${JSON.stringify(params)}`,
         );
 
-      const foundInCloud = await CloudFileManager.downloadFileCloud(
-        CloudFileManager.getTsGoogleDrive(),
+      const foundInCloud = await CloudFileManager.downloadFileCloudPool(
         params.filePath,
         process.env.B3_TIMESNSALES_REMOTE_FOLDER || '',
       );
@@ -241,26 +239,6 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
       });
     });
   }
-
-  /* public async unzipTSFile(pathFilename: string): Promise<string> {
-    const dir = await unzipper.Open.file(pathFilename);
-    if (!dir || dir.files.length !== 1)
-      throw new Error(`Incompatible zip file: ${JSON.stringify(dir.files)}`);
-
-    const unzipFilePath = pathFilename
-      .split('.')
-      .slice(0, -1)
-      .join('.')
-      .concat('.csv');
-
-    return new Promise((resolve, reject) => {
-      dir.files[0]
-        .stream()
-        .pipe(fs.createWriteStream(unzipFilePath))
-        .on('close', () => resolve(unzipFilePath))
-        .on('error', error => reject(error));
-    });
-  } */
 
   public async dbLoadCSVTSFile(pathFilename: string): Promise<ILoadResult> {
     const assets =

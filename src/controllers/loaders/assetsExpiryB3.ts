@@ -147,8 +147,7 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
           exportPathFileName,
         );
         // upload to cloud drive
-        await CloudFileManager.uploadFileCloud(
-          CloudFileManager.getTsGoogleDrive(),
+        await CloudFileManager.uploadFileCloudPool(
           pathZipFileName,
           process.env.B3_ASSETS_EXPIRY_CLOUD_FOLDER || '',
           false,
@@ -210,8 +209,7 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
         throw new Error(
           `[${this.processName}] PerformQuery() - Action: GET_FILE_ASSETS_EXPIRY - Missing parameters`,
         );
-      return CloudFileManager.downloadFileCloud(
-        CloudFileManager.getTsGoogleDrive(),
+      return CloudFileManager.downloadFileCloudPool(
         params.pathFileName,
         process.env.B3_ASSETS_EXPIRY_CLOUD_FOLDER || '',
       );
