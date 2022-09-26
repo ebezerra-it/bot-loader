@@ -6,11 +6,11 @@ import TelegramBot, { Message } from '../telegramBot';
 interface IVMCommandReturn {
   status: string;
   message: string;
-  vmstatus?: { state: string; since: Date };
+  vmstatus?: { state: string; since?: Date };
   screenshotFile?: string;
 }
 
-class vmCommands extends BaseCommands {
+class VMCommands extends BaseCommands {
   VM_PATH_TO_PIPE2HOST_FILE: string;
 
   constructor(bot: TelegramBot) {
@@ -57,57 +57,85 @@ class vmCommands extends BaseCommands {
     });
   }
 
-  private async waitForVMCommand(VMCommand: string): Promise<IVMCommandReturn> {
+  public static async waitForVMCommand(
+    VMCommand: string,
+  ): Promise<IVMCommandReturn> {
     const commandReturn: IVMCommandReturn = <IVMCommandReturn>(
       await new Promise(resolve => {
         const pathFileCmdReturn = path.join(
-          path.dirname(process.env.VM_PIPE2HOST_CONT_DIR || ''),
+          process.env.VM_PIPE2HOST_CONT_DIR || '',
           process.env.VM_PIPE2HOST_COMMAND_RETURN_FILENAME || '',
         );
 
-        const checkCmd = setInterval(() => {
+        let checkCmd: NodeJS.Timer;
+        const checkCmdFunction = () => {
           if (fs.existsSync(pathFileCmdReturn)) {
-            clearInterval(checkCmd);
-            const strRetCmd = String(
-              fs.readFileSync(path.join(pathFileCmdReturn)),
-            );
+            if (checkCmd) clearInterval(checkCmd);
+            const strRetCmd = String(fs.readFileSync(pathFileCmdReturn)).trim();
+            if (strRetCmd === '') {
+              checkCmd = setInterval(checkCmdFunction, 1000);
+              return;
+            }
+            // this.bot.logger.warn(`strRetCmd=${strRetCmd}`);
             try {
               const retCmd = JSON.parse(strRetCmd);
-              if (String(retCmd.status).trim().toLowerCase() === 'success')
-                resolve({
+              if (String(retCmd.status).trim().toLowerCase() === 'success') {
+                const cmdResponse = {
                   status: 'success',
                   message: String(retCmd.message).trim(),
-                  vmstatus: retCmd.state
+                  vmstatus: retCmd.vmstatus
                     ? {
-                        state: String(retCmd.status).trim().toLowerCase(),
-                        since: new Date(String(retCmd.since).trim()),
+                        state: String(retCmd.vmstatus.state)
+                          .trim()
+                          .toLowerCase(),
+                        since: retCmd.vmstatus.upseconds
+                          ? new Date(
+                              Math.round(
+                                new Date().getTime() -
+                                  Number(retCmd.vmstatus.upseconds) * 1000,
+                              ),
+                            )
+                          : undefined,
                       }
                     : undefined,
                   screenshotFile: retCmd.filename,
-                });
-              else
+                };
+                if (!cmdResponse.vmstatus) delete cmdResponse.vmstatus;
+                else if (!cmdResponse.vmstatus.since)
+                  delete cmdResponse.vmstatus.since;
+                if (!cmdResponse.screenshotFile)
+                  delete cmdResponse.screenshotFile;
+                resolve(cmdResponse);
+              } else {
                 resolve({
                   status: 'error',
                   message: String(retCmd.message).trim(),
                 });
+              }
             } catch (err) {
               resolve({
                 status: 'error',
-                message: `Unable to parse VM Command return: ${strRetCmd}`,
+                message: `Unable to parse VM Command return: "${strRetCmd}" due to error: ${JSON.stringify(
+                  err,
+                )}`,
               });
             } finally {
-              fs.unlinkSync(pathFileCmdReturn);
+              if (fs.existsSync(pathFileCmdReturn))
+                fs.unlinkSync(pathFileCmdReturn);
             }
           }
-        }, 1000);
+        };
+        checkCmd = setInterval(checkCmdFunction, 1000);
 
         setTimeout(() => {
           if (checkCmd) clearInterval(checkCmd);
+          if (fs.existsSync(pathFileCmdReturn))
+            fs.unlinkSync(pathFileCmdReturn);
           resolve({
             status: 'error',
             message: `VM Command timed out: ${VMCommand}`,
           });
-        }, Number(process.env.VM_COMMAND_TIMEOUT || '30') * 1000);
+        }, Number(process.env.TRYDLOADER_COMMAND_TIMEOUT || '30') * 1000);
       })
     );
     return commandReturn;
@@ -128,17 +156,18 @@ class vmCommands extends BaseCommands {
       return;
     }
 
-    const vmCommand = `VMSTART VM_NAME=${process.env.VM_NAME} VM_SNAPSHOT_START=${process.env.VM_SNAPSHOT_START} VM_NAME=${process.env.VM_NAME} HOST_IP=${process.env.HOST_IP} DB_PORT=${process.env.DB_PORT} DB_NAME=${process.env.DB_NAME} DB_USER=${process.env.DB_USER} DB_PASS=${process.env.DB_PASS} TELEGRAM_API_PORT=${process.env.TELEGRAM_API_PORT}`;
-    const ws = fs.createWriteStream(this.VM_PATH_TO_PIPE2HOST_FILE);
-    ws.write(vmCommand);
-    ws.close();
+    const vmCommand = `VMSTART VM_NAME=${process.env.VM_NAME} VM_HOST_NAME=${process.env.VM_HOST_NAME} VM_HOST_IP=${process.env.VM_HOST_IP} VM_USER=${process.env.VM_USER} VM_PASS='${process.env.VM_PASS}' VM_SNAPSHOT_START=${process.env.VM_SNAPSHOT_START} VM_FILESYSTEM_XML_PATH=${process.env.VM_FILESYSTEM_XML_PATH} DB_PORT=${process.env.DB_PORT} DB_NAME=${process.env.DB_NAME} DB_USER=${process.env.DB_USER} DB_PASS='${process.env.DB_PASS}' TELEGRAM_API_PORT=${process.env.TELEGRAM_API_PORT}`;
+    // this.bot.logger.warn(`VM_COMMAND=${vmCommand}`);
 
-    const commandReturn: IVMCommandReturn = await this.waitForVMCommand(
+    fs.appendFileSync(this.VM_PATH_TO_PIPE2HOST_FILE, vmCommand);
+
+    const commandReturn: IVMCommandReturn = await VMCommands.waitForVMCommand(
       vmCommand,
     );
+
     await this.bot.sendMessage(
       msg.chat.id,
-      `${JSON.stringify(commandReturn)}`,
+      `${TelegramBot.printJSON(commandReturn)}`,
       {
         reply_to_message_id: msg.message_id,
       },
@@ -160,15 +189,18 @@ class vmCommands extends BaseCommands {
       return;
     }
 
-    const CMD = `VMSTOP VM_NAME=${process.env.VM_NAME}`;
-    const ws = fs.createWriteStream(this.VM_PATH_TO_PIPE2HOST_FILE);
-    ws.write(CMD);
-    ws.close();
+    const vmCommand = `VMSTOP VM_NAME=${process.env.VM_NAME}`;
+    // this.bot.logger.warn(`VM_COMMAND=${vmCommand}`);
 
-    const commandReturn: IVMCommandReturn = await this.waitForVMCommand(CMD);
+    fs.appendFileSync(this.VM_PATH_TO_PIPE2HOST_FILE, vmCommand);
+
+    const commandReturn: IVMCommandReturn = await VMCommands.waitForVMCommand(
+      vmCommand,
+    );
+
     await this.bot.sendMessage(
       msg.chat.id,
-      `${JSON.stringify(commandReturn)}`,
+      `${TelegramBot.printJSON(commandReturn)}`,
       {
         reply_to_message_id: msg.message_id,
       },
@@ -190,15 +222,20 @@ class vmCommands extends BaseCommands {
       return;
     }
 
-    const CMD = `VMRESTART VM_NAME=${process.env.VM_NAME} VM_SNAPSHOT_START=${process.env.VM_SNAPSHOT_START} VM_NAME=${process.env.VM_NAME} HOST_IP=${process.env.HOST_IP} DB_PORT=${process.env.DB_PORT} DB_NAME=${process.env.DB_NAME} DB_USER=${process.env.DB_USER} DB_PASS=${process.env.DB_PASS} TELEGRAM_API_PORT=${process.env.TELEGRAM_API_PORT}`;
-    const ws = fs.createWriteStream(this.VM_PATH_TO_PIPE2HOST_FILE);
-    ws.write(CMD);
-    ws.close();
+    const vmCommand = `VMRESTART VM_NAME=${process.env.VM_NAME} VM_HOST_NAME=${process.env.VM_HOST_NAME} VM_HOST_IP=${process.env.VM_HOST_IP} VM_USER=${process.env.VM_USER} VM_PASS=${process.env.VM_PASS} VM_SNAPSHOT_START=${process.env.VM_SNAPSHOT_START} VM_FILESYSTEM_XML_PATH=${process.env.VM_FILESYSTEM_XML_PATH} DB_PORT=${process.env.DB_PORT} DB_NAME=${process.env.DB_NAME} DB_USER=${process.env.DB_USER} DB_PASS=${process.env.DB_PASS} TELEGRAM_API_PORT=${process.env.TELEGRAM_API_PORT}`;
 
-    const commandReturn: IVMCommandReturn = await this.waitForVMCommand(CMD);
+    fs.appendFileSync(this.VM_PATH_TO_PIPE2HOST_FILE, vmCommand);
+
+    const commandReturn: IVMCommandReturn = await VMCommands.waitForVMCommand(
+      vmCommand,
+    );
+    /* this.bot.logger.warn(
+      `VM_COMMAND_RETURN=${JSON.stringify(commandReturn, null, 4)}`,
+    ); */
+
     await this.bot.sendMessage(
       msg.chat.id,
-      `${JSON.stringify(commandReturn)}`,
+      `${TelegramBot.printJSON(commandReturn)}`,
       {
         reply_to_message_id: msg.message_id,
       },
@@ -220,15 +257,18 @@ class vmCommands extends BaseCommands {
       return;
     }
 
-    const CMD = `VMSTATUS VM_NAME=${process.env.VM_NAME}`;
-    const ws = fs.createWriteStream(this.VM_PATH_TO_PIPE2HOST_FILE);
-    ws.write(CMD);
-    ws.close();
+    const vmCommand = `VMSTATUS VM_NAME=${process.env.VM_NAME}`;
+    // this.bot.logger.warn(`VM_COMMAND=${vmCommand}`);
 
-    const commandReturn: IVMCommandReturn = await this.waitForVMCommand(CMD);
+    fs.appendFileSync(this.VM_PATH_TO_PIPE2HOST_FILE, vmCommand);
+
+    const commandReturn: IVMCommandReturn = await VMCommands.waitForVMCommand(
+      vmCommand,
+    );
+
     await this.bot.sendMessage(
       msg.chat.id,
-      `${JSON.stringify(commandReturn)}`,
+      `${TelegramBot.printJSON(commandReturn)}`,
       {
         reply_to_message_id: msg.message_id,
       },
@@ -250,16 +290,18 @@ class vmCommands extends BaseCommands {
       return;
     }
 
-    const CMD = `VMSCREENSHOT VM_NAME=${process.env.VM_NAME} VM_SCREENSHOTS_HOST_DIR=${process.env.VM_SCREENSHOTS_HOST_DIR}`;
-    const ws = fs.createWriteStream(this.VM_PATH_TO_PIPE2HOST_FILE);
-    ws.write(CMD);
-    ws.close();
+    const vmCommand = `VMSCREENSHOT VM_NAME=${process.env.VM_NAME} VM_SCREENSHOTS_HOST_DIR=${process.env.VM_SCREENSHOTS_HOST_DIR}`;
+    // this.bot.logger.warn(`VM_COMMAND=${vmCommand}`);
 
-    const commandReturn: IVMCommandReturn = await this.waitForVMCommand(CMD);
+    fs.appendFileSync(this.VM_PATH_TO_PIPE2HOST_FILE, vmCommand);
+
+    const commandReturn: IVMCommandReturn = await VMCommands.waitForVMCommand(
+      vmCommand,
+    );
 
     if (
-      commandReturn.screenshotFile &&
-      fs.existsSync(
+      !commandReturn.screenshotFile ||
+      !fs.existsSync(
         path.join(
           process.env.VM_SCREENSHOTS_CONT_DIR || '',
           commandReturn.screenshotFile,
@@ -280,14 +322,22 @@ class vmCommands extends BaseCommands {
       msg.chat.id,
       path.join(
         process.env.VM_SCREENSHOTS_CONT_DIR || '',
-        commandReturn.screenshotFile!,
+        commandReturn.screenshotFile,
       ),
       {
         caption: commandReturn.screenshotFile!,
         reply_to_message_id: msg.message_id,
       },
     );
+
+    fs.unlinkSync(
+      path.join(
+        process.env.VM_SCREENSHOTS_CONT_DIR || '',
+        commandReturn.screenshotFile,
+      ),
+    );
   }
 }
 
-export default vmCommands;
+export default VMCommands;
+export { IVMCommandReturn };

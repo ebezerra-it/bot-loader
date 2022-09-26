@@ -340,22 +340,41 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
                 const regExHeader = response
                   .headers()
                   ['content-disposition'].match(
-                    /^\s*(attachment|inline)\s*;\s*filename\s*=\s*"?([^;]*)"?\s*(;\s*size=(\d+))?$/,
+                    // /^\s*(attachment|inline)\s*;\s*filename\s*=\s*"?([^;]*)"?\s*(;\s*size=(\d+))?$/,
+                    /^\s*(attachment|inline)\s*(;\s*size=(\d+))?;\s*filename\s*=\s*"?([^;]*)"?\s*(;\s*size=(\d+))?$/,
                   );
-                if (!regExHeader) reject(new Error(''));
+                if (!regExHeader) {
+                  clearTimeout(downloadTimeout);
+                  page!.removeAllListeners('response');
+                  reject(
+                    new Error(
+                      `Unknown header format: CONTENT-DISPOSITION="${
+                        response.headers()['content-disposition']
+                      }" - CONTENT-LENGTH="${
+                        response.headers()['content-length']
+                      }"`,
+                    ),
+                  );
+                }
 
-                const filename = regExHeader![2] || undefined;
+                const filename = regExHeader![4] || undefined;
                 const filesize = Number(
-                  regExHeader![4] || response.headers()['content-length'],
+                  regExHeader![3] ||
+                    regExHeader![6] ||
+                    (response.headers()['content-length'] === null
+                      ? undefined
+                      : response.headers()['content-length']),
                 );
                 if (!filename || Number.isNaN(filesize) || filesize === 0) {
                   clearTimeout(downloadTimeout);
                   page!.removeAllListeners('response');
                   reject(
                     new Error(
-                      `Can't read filename from header: ${
+                      `Invalid header data: CONTENT-DISPOSITION="${
                         response.headers()['content-disposition']
-                      } ${response.headers()['content-length']}`,
+                      }" - CONTENT-LENGTH="${
+                        response.headers()['content-length']
+                      }" - REGEXHEADER=${JSON.stringify(regExHeader)}`,
                     ),
                   );
                 }

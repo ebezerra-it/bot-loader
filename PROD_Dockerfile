@@ -20,4 +20,3 @@ COPY cert/ssl/client.key ./cert/ssl/client.key
 COPY cert/ssl/client.crt ./cert/ssl/client.crt
 COPY build ./build
 COPY config ./config
-VOLUME /pipetohost

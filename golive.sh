@@ -20,6 +20,6 @@ echo "[MYORACULUM-BOTLOADER] Building docker image and starting service"
 COMPOSE_DOCKER_CLI_BUILD=0 docker-compose -f PROD_docker-compose.yml --env-file ./prod.env up --build --detach $SERVICE
 echo "[MYORACULUM-BOTLOADER] Deleting unused images"
 docker image prune --all --force
-echo "[MYORACULUM-BOTLOADER] Service deployed successfully - App version: $APP_VERSION" 
+echo "[MYORACULUM-BOTLOADER] Service deployed successfully - App version: $APP_VERSION - Date:" `date`
 unset APP_VERSION SERVICE #DOCKER_HOST
 docker context use default

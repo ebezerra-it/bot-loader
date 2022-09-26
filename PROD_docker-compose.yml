@@ -11,9 +11,9 @@ services:
     
     container_name: myoraculum-botloader
     volumes: 
-      - myoraculum-botloader_log:/app/myoraculum-botloader/log
-      - ${VM_HOST_HOST2PIPE_DIR}:${VM_CONT_HOST2PIPE_DIR}
-      - ${VM_HOST_SCREENSHOTS_DIR}:${VM_CONT_SCREENSHOTS_DIR}
+      - myoraculum-botloader_log:/app/myoraculum-botloader/log:rw
+      - ${VM_PIPE2HOST_HOST_DIR}:${VM_PIPE2HOST_CONT_DIR}:rw
+      - ${VM_SCREENSHOTS_HOST_DIR}:${VM_SCREENSHOTS_CONT_DIR}:rw
     
     restart: "no" #unless-stopped
 

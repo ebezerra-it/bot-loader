@@ -26,6 +26,7 @@ import AssetsExpiryCME from './loaders/assetsExpiryCME';
 import AssetsExpiryB3 from './loaders/assetsExpiryB3';
 import ChartLoaderTradingView from './loaders/chartLoaderTradingView';
 import ChartLoaderYahoo from './loaders/chartLoaderYahoo';
+import TrydLoaderStarter from './loaders/trydLoaderStarter';
 
 interface ICronJob {
   name: string;
@@ -291,6 +292,19 @@ class TaskManager extends EventEmitter {
       class: new AssetsExpiryB3(
         'AssetsExpiryB3',
         this.logger.getChildLogger({ name: 'AssetsExpiryB3' }),
+        this.queryfactory,
+        TExchange.B3,
+      ),
+      cron: process.env.DEFAULT_SCHEDULE_CRON || '0 0 0 31 2 *',
+      timezone: TTimezone.B3,
+      dtRefAdj: parseInt(process.env.DEFAULT_SCHEDULE_ADJUST || '0'),
+    });
+
+    schedules.push({
+      name: 'TrydLoaderStarter',
+      class: new TrydLoaderStarter(
+        'TrydLoaderStarter',
+        this.logger.getChildLogger({ name: 'TrydLoaderStarter' }),
         this.queryfactory,
         TExchange.B3,
       ),
