@@ -33,7 +33,7 @@ export default class tblB3Brokersbalance1659394131573
             name: 'vwap',
             type: 'numeric',
             precision: 12,
-            scale: 5,
+            scale: 2,
             isNullable: false,
             unsigned: true,
           },

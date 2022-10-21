@@ -6,3 +6,4 @@ data/
 profit/
 cert/ssl/
 *.log
+pipe2host/

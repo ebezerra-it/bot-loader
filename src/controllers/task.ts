@@ -96,7 +96,7 @@ class Task extends EventEmitter {
                 this.reportLoader.logger.warn(
                   `[${this.name}] - DateRef: ${this.params.dateRef.toFormat(
                     'dd/MM/yyyy',
-                  )} - Task finished empty. Waiting for REPROCESS schedule.`,
+                  )} - Non Calendar Task finished empty. Waiting for REPROCESS schedule.`,
                 );
                 return { ...results };
               }

@@ -8,7 +8,7 @@
       "type": "pwa-node",
       "address": "localhost",
       "localRoot": "${workspaceFolder}",
-      "remoteRoot": "/app/myoraculum-botloader",
+      "remoteRoot": "/app/myoraculum/botloader",
       "skipFiles": ["<node_internals>/**"],
       "sourceMapPathOverrides": {
         "/app/myoraculum-botloader/src/**": "${workspaceRoot}/src/**",

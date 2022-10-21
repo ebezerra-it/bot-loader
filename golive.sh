@@ -10,6 +10,13 @@ if [ -n $2 ]; then
     SERVICE=$2
 fi
 
+printf "[MYORACULUM-BOTLOADER] !!! ATTENTION !!!: GOING LIVE \e[5m\e[31mBOT-LOADER\e[0m - Type <BOTLOADER> to continue: "
+read CONFIRM
+if [ "$CONFIRM" != "BOTLOADER" ]; then
+    echo "Script confirmation failed"
+    exit 1;
+fi
+
 echo "[MYORACULUM-BOTLOADER] Generating build - App version $APP_VERSION"
 yarn build
 unset DOCKER_HOST

@@ -11,8 +11,8 @@ services:
     container_name: myoraculum-botloader
     volumes: 
       - ./:/app/myoraculum/botloader
-      - ./pipe2host:${VM_CONT_HOST2PIPE_DIR}
-      - ./vmscreenshots:${VM_CONT_SCREENSHOTS_DIR}
+      - ./pipe2host:${VM_PIPE2HOST_CONT_DIR}
+      - ./vmscreenshots:${VM_SCREENSHOTS_CONT_DIR}
     
     command:
       - /bin/bash

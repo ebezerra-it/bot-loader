@@ -25,6 +25,9 @@ import QueryVolatility, {
   TAssetType,
 } from '../../controllers/queries/queryVolatility';
 import QueryFRP0, { TContractType } from '../../controllers/queries/queryFRP0';
+import QueryBrokersBalance, {
+  IAsset,
+} from '../../controllers/queries/queryBrokersBalance';
 
 const MSG_INVALID_DATE = `Invalid reference date or date is weekend/holiday: $1`;
 const MSG_INVALID_DATES_ORDER = `Invalid dates: date from can't be after date to.`;
@@ -96,6 +99,14 @@ class QueryCommands extends BaseCommands {
         /^\/query\sOI\s(DOL|IND)\s([FGHJKMNQUVXZ][0-9]{2})(\s\d\d\/\d\d\/\d\d\d\d)?(\s\d\d\/\d\d\/\d\d\d\d)?$/gi,
       ),
       procedure: this.queryOI,
+    });
+
+    this.botCommands.push({
+      name: 'queryBrokersBalance',
+      regEx: new RegExp(
+        /^\/query\sBROKERSBAL\s(DOL|IND|[A-Z0-9]+)(\s[FGHJKMNQUVXZ][0-9]{2})?\s([A-Z0-9-_]+)\s(\d\d\/\d\d\/\d\d\d\d)\s(\d\d:\d\d)(:\d\d)?$/gi,
+      ),
+      procedure: this.queryBrokersBal,
     });
 
     this.botCommands.push({
@@ -680,6 +691,87 @@ class QueryCommands extends BaseCommands {
       assets,
       dateFrom,
       dateTo,
+      chatId: user.chatId,
+      messageId: msg.message_id,
+    });
+  }
+
+  private async queryBrokersBal(
+    msg: Message,
+    match?: RegExpExecArray | null,
+  ): Promise<void> {
+    const { cmdAllowed, user } = await this.checkAuth(
+      msg,
+      TUserType.DEFAULT,
+      true,
+    );
+    if (!cmdAllowed || !user) return;
+
+    const args = match!.map(a => (a ? a.trim().toUpperCase() : a));
+    args.splice(0, 1);
+
+    const contract = args[1];
+    let assets: IAsset[];
+    switch (args[0]) {
+      case 'DOL':
+        assets = [
+          { name: `DOL${contract}`, weight: 1 },
+          { name: `WDO${contract}`, weight: 0.2 },
+        ];
+        break;
+      case 'IND':
+        assets = [
+          { name: `IND${contract}`, weight: 1 },
+          { name: `WIN${contract}`, weight: 0.2 },
+        ];
+        break;
+      default:
+        assets = [{ name: String(args[0]), weight: 1 }];
+    }
+
+    const visionName = args[2];
+
+    let dateRef: DateTime;
+
+    if (args[5]) {
+      dateRef = DateTime.fromFormat(
+        `${args[3]} ${args[4]}`,
+        'dd/MM/yyyy HH:mm',
+      );
+    } else {
+      dateRef = DateTime.fromFormat(
+        `${args[3]} ${args[4]}${args[5]}`,
+        'dd/MM/yyyy HH:mm:ss',
+      );
+    }
+
+    if (
+      !dateRef.isValid ||
+      !(await ReportLoaderCalendar.isTradeDay(
+        this.bot.queryFactory,
+        dateRef,
+        TCountryCode.BR,
+      ))
+    ) {
+      await this.bot.sendMessage(
+        msg.chat.id,
+        MSG_INVALID_DATE.replace(
+          /\$1/g,
+          dateRef.isValid
+            ? dateRef.toFormat('dd/MM/yyyy HH:mm:ss')
+            : `${args[3]} ${args[4]}${args[5]}`,
+        ),
+        {
+          reply_to_message_id: msg.message_id,
+        },
+      );
+      return;
+    }
+
+    await new QueryBrokersBalance(this.bot).process({
+      assets,
+      datetime: dateRef,
+      visionName,
       chatId: user.chatId,
       messageId: msg.message_id,
     });

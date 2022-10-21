@@ -198,12 +198,13 @@ abstract class ReportLoader {
     )
       return true;
 
-    return qCalendar.find((q: any) =>
-      holidayExceptionsCountry.exceptions.find(
-        he =>
-          String(he).trim().toUpperCase() ===
-          String(q.event).trim().toUpperCase(),
-      ),
+    return !qCalendar.find(
+      (q: any) =>
+        !!holidayExceptionsCountry.exceptions.find(
+          he =>
+            String(he).trim().toUpperCase() ===
+            String(q.event).trim().toUpperCase(),
+        ),
     );
   }
 
