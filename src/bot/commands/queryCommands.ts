@@ -104,7 +104,7 @@ class QueryCommands extends BaseCommands {
     this.botCommands.push({
       name: 'queryBrokersBalance',
       regEx: new RegExp(
-        /^\/query\sBROKERSBAL\s(DOL|IND|[A-Z0-9]+)(\s[FGHJKMNQUVXZ][0-9]{2})?\s([A-Z0-9-_]+)\s(\d\d\/\d\d\/\d\d\d\d)\s(\d\d:\d\d)(:\d\d)?$/gi,
+        /^\/query\sBROKERSBAL\s(DOL|IND|[A-Z0-9]+)(\s[FGHJKMNQUVXZ][0-9]{2})?\s([A-Z0-9-_]+)(\s\d\d\/\d\d\/\d\d\d\d(\s\d\d:\d\d)?)(\s\d\d:\d\d)?$/gi,
       ),
       procedure: this.queryBrokersBal,
     });
@@ -731,35 +731,35 @@ class QueryCommands extends BaseCommands {
 
     const visionName = args[2];
 
-    let dateRef: DateTime;
+    let dateFrom: DateTime;
+    let dateTo: DateTime | undefined;
+
+    if (!args[4]) {
+      dateFrom = DateTime.fromFormat(args[3], 'dd/MM/yyyy').set({
+        hour: 19,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+      });
+    } else {
+      dateFrom = DateTime.fromFormat(args[3], 'dd/MM/yyyy HH:mm');
+    }
 
     if (args[5]) {
-      dateRef = DateTime.fromFormat(
-        `${args[3]} ${args[4]}`,
+      dateTo = DateTime.fromFormat(
+        `${dateFrom.toFormat('dd/MM/yyyy')} ${args[5]}`,
         'dd/MM/yyyy HH:mm',
-      );
-    } else {
-      dateRef = DateTime.fromFormat(
-        `${args[3]} ${args[4]}${args[5]}`,
-        'dd/MM/yyyy HH:mm:ss',
       );
     }
 
-    if (
-      !dateRef.isValid ||
-      !(await ReportLoaderCalendar.isTradeDay(
-        this.bot.queryFactory,
-        dateRef,
-        TCountryCode.BR,
-      ))
-    ) {
+    if (!dateFrom.isValid || (dateTo && !dateTo.isValid)) {
       await this.bot.sendMessage(
         msg.chat.id,
         MSG_INVALID_DATE.replace(
           /\$1/g,
-          dateRef.isValid
-            ? dateRef.toFormat('dd/MM/yyyy HH:mm:ss')
-            : `${args[3]} ${args[4]}${args[5]}`,
+          dateFrom.isValid
+            ? dateFrom.toFormat('dd/MM/yyyy HH:mm')
+            : `Date from: ${args[3]} ${args[4]}${args[5]} - Date to: ${args[8]}`,
         ),
         {
           reply_to_message_id: msg.message_id,
@@ -768,9 +768,20 @@ class QueryCommands extends BaseCommands {
       return;
     }
 
+    if (
+      dateTo &&
+      dateFrom.startOf('day').toMillis() > dateTo.startOf('day').toMillis()
+    ) {
+      await this.bot.sendMessage(msg.chat.id, MSG_INVALID_DATES_ORDER, {
+        reply_to_message_id: msg.message_id,
+      });
+      return;
+    }
+
     await new QueryBrokersBalance(this.bot).process({
       assets,
-      datetime: dateRef,
+      dateFrom,
+      dateTo,
       visionName,
       chatId: user.chatId,
       messageId: msg.message_id,

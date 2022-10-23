@@ -59,19 +59,42 @@ const VISION_BROKERS_DB_TABLE = 'Brokers DB Table';
 export default class QueryBrokersBalance extends Query {
   public async process(params: {
     assets: IAsset[];
-    datetime: DateTime;
+    dateFrom: DateTime;
+    dateTo?: DateTime;
     visionName?: string;
     chatId?: number;
     messageId?: number;
   }): Promise<boolean> {
+    let msgHeader;
     let botResponse;
+    let balanceVisionFrom: IBalanceVision | undefined;
+    let balanceVisionTo: IBalanceVision | undefined;
     let balanceVision: IBalanceVision | undefined;
+
+    if (params.dateTo) {
+      msgHeader = `BROKERS BALANCE DIFFERENCE - Assets: ${params.assets.map(
+        a => a.name,
+      )} - Date from: ${params.dateFrom.toFormat(
+        'dd/MM/yyyy HH:mm',
+      )} - Date to: ${params.dateTo.toFormat('dd/MM/yyyy HH:mm')}\n`;
+    } else {
+      msgHeader = `BROKERS BALANCE - Assets: ${params.assets.map(
+        a => a.name,
+      )} - Date from: ${params.dateFrom.toFormat('dd/MM/yyyy HH:mm')}\n`;
+    }
+
     if (
       !(await ReportLoaderCalendar.isTradeDay(
         this.queryFactory,
-        params.datetime,
+        params.dateFrom,
         TCountryCode.BR,
-      ))
+      )) ||
+      (params.dateTo &&
+        !(await ReportLoaderCalendar.isTradeDay(
+          this.queryFactory,
+          params.dateTo,
+          TCountryCode.BR,
+        )))
     )
       botResponse = 'Reference date is not a trade day.';
     else {
@@ -82,12 +105,28 @@ export default class QueryBrokersBalance extends Query {
 
       if (!brokersVision) return false;
 
-      balanceVision = await QueryBrokersBalance.getBalanceVision(
+      balanceVisionFrom = await QueryBrokersBalance.getBalanceVision(
         this.queryFactory,
         brokersVision,
-        params.datetime,
+        params.dateFrom,
         params.assets,
       );
+
+      if (!params.dateTo) {
+        balanceVision = balanceVisionFrom;
+      } else {
+        balanceVisionTo = await QueryBrokersBalance.getBalanceVision(
+          this.queryFactory,
+          brokersVision,
+          params.dateTo,
+          params.assets,
+        );
+
+        balanceVision = QueryBrokersBalance.calculateBrokersBalanceVisionDiff(
+          balanceVisionFrom,
+          balanceVisionTo,
+        );
+      }
 
       if (balanceVision) {
         delete balanceVision.brokersBalance;
@@ -95,10 +134,6 @@ export default class QueryBrokersBalance extends Query {
         botResponse = TelegramBot.printJSON(balanceVision);
       } else botResponse = 'Not enought data.';
     }
-
-    const msgHeader = `BROKERS BALANCE - Assets: ${params.assets.map(
-      a => a.name,
-    )} - Datetime: ${params.datetime.toFormat('dd/MM/yyyy HH:mm:ss')}\n`;
 
     if (!params.chatId) {
       this.bot.sendMessageToUsers(
@@ -324,6 +359,87 @@ export default class QueryBrokersBalance extends Query {
         }),
       };
     }
+  }
+
+  public static calculateBrokersBalanceVisionDiff(
+    brokersBalVisionFrom: IBalanceVision | undefined,
+    brokersBalVisionTo: IBalanceVision | undefined,
+  ): IBalanceVision | undefined {
+    if (!brokersBalVisionFrom && !brokersBalVisionTo) return undefined;
+    if (!brokersBalVisionFrom) return brokersBalVisionTo;
+    if (!brokersBalVisionTo) return brokersBalVisionFrom;
+
+    const brokersBalDiff: IBrokerBalance[] = [];
+    brokersBalVisionFrom.brokersBalance?.forEach(bfrom => {
+      const brokerTo: IBrokerBalance | undefined =
+        brokersBalVisionTo.brokersBalance?.find(
+          bto => bto.broker.id === bfrom.broker.id,
+        );
+
+      if (brokerTo) {
+        brokersBalDiff.push({
+          broker: bfrom.broker,
+          datetime:
+            bfrom.datetime > brokerTo.datetime
+              ? bfrom.datetime
+              : brokerTo.datetime,
+          volume: brokerTo.volume - bfrom.volume,
+          vwap: +(
+            (brokerTo.volume * brokerTo.vwap - bfrom.volume * bfrom.vwap) /
+            (brokerTo.volume + bfrom.volume)
+          ).toFixed(2),
+        });
+      } else {
+        brokersBalDiff.push(bfrom);
+      }
+    });
+    brokersBalVisionTo.brokersBalance?.forEach(bto => {
+      if (
+        !brokersBalVisionFrom.brokersBalance?.find(
+          bfrom => bfrom.broker.id === bto.broker.id,
+        )
+      )
+        brokersBalDiff.push(bto);
+    });
+
+    const brokerTypesBalDiff: IBrokerTypesBalance[] = [];
+    brokersBalVisionFrom.brokerTypesBalance?.forEach(tFrom => {
+      const typeTo: IBrokerTypesBalance | undefined =
+        brokersBalVisionTo.brokerTypesBalance?.find(
+          tTo => tTo.brokerType === tFrom.brokerType,
+        );
+
+      if (typeTo) {
+        brokerTypesBalDiff.push({
+          brokerType: tFrom.brokerType,
+          datetime:
+            tFrom.datetime > typeTo.datetime ? tFrom.datetime : typeTo.datetime,
+          volume: typeTo.volume - tFrom.volume,
+          vwap: +(
+            (typeTo.volume * typeTo.vwap - tFrom.volume * tFrom.vwap) /
+            (typeTo.volume - tFrom.volume)
+          ).toFixed(2),
+        });
+      } else {
+        brokerTypesBalDiff.push(tFrom);
+      }
+    });
+    brokersBalVisionTo.brokerTypesBalance?.forEach(tTo => {
+      if (
+        !brokersBalVisionFrom.brokerTypesBalance?.find(
+          tFrom => tFrom.brokerType === tTo.brokerType,
+        )
+      )
+        brokerTypesBalDiff.push(tTo);
+    });
+
+    return {
+      visionName: brokersBalVisionTo.visionName,
+      assets: brokersBalVisionTo.assets,
+      datetime: brokersBalVisionTo.datetime,
+      brokersBalance: brokersBalDiff,
+      brokerTypesBalance: brokerTypesBalDiff,
+    };
   }
 }
 export { IAsset, IBroker, IBrokersVision, IBrokerBalance, IBrokerTypesBalance };
