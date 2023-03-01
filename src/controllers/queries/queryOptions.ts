@@ -2,15 +2,11 @@
 /* eslint-disable no-nested-ternary */
 import { DateTime } from 'luxon';
 import Query from './query';
-import TelegramBot, { TUserType } from '../../bot/telegramBot';
+import BaseBot, { TUserType } from '../../bot/baseBot';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
 import { TCountryCode } from '../tcountry';
 import { QueryFactory } from '../../db/queryFactory';
-
-enum TContract {
-  CURRENT = 'CURRENT',
-  NEXT = 'NEXT',
-}
+import { TContractType } from './queryFRP0';
 
 interface IContract {
   code: string;
@@ -65,25 +61,22 @@ export default class QueryOptions extends Query {
     )}\n`;
 
     let botResponse;
-    if (usdOpts) botResponse = TelegramBot.printJSON(usdOpts);
+    if (usdOpts) botResponse = BaseBot.printJSON(usdOpts);
     else botResponse = 'Not enought data.';
 
     if (!params.chatId) {
       this.bot.sendMessageToUsers(
         TUserType.DEFAULT,
         botResponse,
-        {},
+        undefined,
         false,
         msgHeader,
       );
     } else {
-      this.bot.sendMessage(
-        params.chatId,
-        `${msgHeader}${botResponse}`,
-        params.messageId
-          ? { reply_to_message_id: params.messageId }
-          : undefined,
-      );
+      this.bot.sendMessage(`${msgHeader}${botResponse}`, {
+        chatId: params.chatId,
+        replyToMessageId: params.messageId ? params.messageId : undefined,
+      });
     }
 
     return !!usdOpts;
@@ -122,13 +115,13 @@ export default class QueryOptions extends Query {
 
     // const contract = await this.getContractCode(dateRef, TContract.CURRENT);
     // const contractNext = await this.getContractCode(dateRef, TContract.NEXT);
-    const frp_c1 = await this.getFRP(dateRef, dateRef, TContract.CURRENT);
+    const frp_c1 = await this.getFRP(dateRef, dateRef, TContractType.CURRENT);
     if (!frp_c1) return undefined;
 
     const frp_c2 = await this.getFRP(
       dateRef,
       frp_c1.contract.dateExpiry,
-      TContract.CURRENT,
+      TContractType.CURRENT,
     );
     if (!frp_c2) return undefined;
 
@@ -219,7 +212,7 @@ export default class QueryOptions extends Query {
 
   private async getContractCode(
     dateRef: DateTime,
-    contractType: TContract,
+    contractType: TContractType,
     year4digits = false,
   ): Promise<IContract> {
     return QueryOptions.getContractCode(
@@ -233,7 +226,7 @@ export default class QueryOptions extends Query {
   public static async getContractCode(
     queryFactory: QueryFactory,
     dateRef: DateTime,
-    contractType: TContract,
+    contractType: TContractType,
     year4digits = false,
   ): Promise<IContract> {
     if (!dateRef.isValid)
@@ -258,7 +251,7 @@ export default class QueryOptions extends Query {
     let lastTradeDate: DateTime;
     let month: number;
     let year: number;
-    if (contractType === TContract.CURRENT) {
+    if (contractType === TContractType.CURRENT) {
       dateExpiry = dateRef.startOf('day').set({ day: 1 }).plus({ months: 1 });
       month = dateExpiry.month;
       year = dateExpiry.year;
@@ -321,18 +314,36 @@ export default class QueryOptions extends Query {
   private async getFRP(
     dateRef: DateTime,
     dateContract: DateTime,
-    contractType: TContract,
+    contractType: TContractType,
   ): Promise<IFRP | undefined> {
-    const qFRP = await this.queryFactory.runQuery(
-      `SELECT 
+    let qFRP;
+
+    if (
+      dateRef.startOf('day').toMillis() ===
+      DateTime.now().startOf('day').toMillis()
+    ) {
+      qFRP = await this.queryFactory.runQuery(
+        `SELECT 
+        (high + low)/2 pmo, vwap  
+        FROM "b3-assetsquotes" 
+        WHERE asset = 'FRP0' AND datetime<$1 AND datetime::DATE=$1
+        ORDER BY datetime DESC LIMIT 1`,
+        {
+          dateRef: dateRef.toJSDate(),
+        },
+      );
+    } else {
+      qFRP = await this.queryFactory.runQuery(
+        `SELECT 
       (MAX(high) + MIN(low))/2 pmo, 
       (stddev_combine(volume, vwap, sigma)).mean vwap  
       FROM "b3-ts-summary" 
       WHERE asset = 'FRP0' AND "timestamp-open"::DATE=$1`,
-      {
-        dateRef: dateRef.toJSDate(),
-      },
-    );
+        {
+          dateRef: dateRef.toJSDate(),
+        },
+      );
+    }
 
     let contract = await this.getContractCode(dateContract, contractType);
     if (
@@ -343,7 +354,7 @@ export default class QueryOptions extends Query {
 
     const contratNext = await this.getContractCode(
       contract.dateExpiry,
-      TContract.CURRENT,
+      TContractType.CURRENT,
     );
     const previousTradeDate = await ReportLoaderCalendar.subTradeDays(
       this.queryFactory,
@@ -402,12 +413,88 @@ export default class QueryOptions extends Query {
       },
     );
 
-    const qPTAX = await this.queryFactory.runQuery(
-      `SELECT pbrl_ptax_sell ptax FROM "bcb-ptax" WHERE date::DATE=$1`,
+    let qPTAX = await this.queryFactory.runQuery(
+      `SELECT "bcb-ptax".date::DATE as date, 
+      "bcb-ptax"."pbrl_p1_sell" * 1000 as p1, p1_datetime as d1, 
+      "bcb-ptax"."pbrl_p2_sell" * 1000 as p2, p2_datetime as d2, 
+      "bcb-ptax"."pbrl_p3_sell" * 1000 as p3, p3_datetime as d3, 
+      "bcb-ptax"."pbrl_p4_sell" * 1000 as p4, p4_datetime as d4, 
+      "bcb-ptax"."pbrl_ptax_sell" * 1000 as ptax, ptax_datetime as dptax 
+      FROM "bcb-ptax" WHERE date::DATE=$1::DATE`,
       {
         dateRef: previousTradeDate.toJSDate(),
       },
     );
+
+    if (!qPTAX || qPTAX.length === 0) {
+      qPTAX = await this.queryFactory.runQuery(
+        `SELECT "bcb-ptax".date::DATE as date, 
+        "bcb-ptax"."pbrl_p1_sell" * 1000 as p1, p1_datetime as d1, 
+        "bcb-ptax"."pbrl_p2_sell" * 1000 as p2, p2_datetime as d2, 
+        "bcb-ptax"."pbrl_p3_sell" * 1000 as p3, p3_datetime as d3, 
+        "bcb-ptax"."pbrl_p4_sell" * 1000 as p4, p4_datetime as d4, 
+        "bcb-ptax"."pbrl_ptax_sell" * 1000 as ptax, ptax_datetime as dptax  
+        FROM "bcb-ptax" WHERE date::DATE<$1::DATE LIMIT 1`,
+        {
+          dateRef: previousTradeDate.toJSDate(),
+        },
+      );
+    }
+
+    let ptax;
+    if (
+      qPTAX[0].ptax &&
+      qPTAX[0].ptax > 0 &&
+      qPTAX[0].dptax &&
+      qPTAX[0].dptax.getTime() <= dateRef.toMillis()
+    )
+      ptax = qPTAX[0].ptax;
+    else {
+      const prevQty =
+        (qPTAX[0].p1 &&
+        qPTAX[0].d1 &&
+        qPTAX[0].d1.getTime() <= dateRef.toMillis()
+          ? 1
+          : 0) +
+        (qPTAX[0].p2 &&
+        qPTAX[0].d2 &&
+        qPTAX[0].d2.getTime() <= dateRef.toMillis()
+          ? 1
+          : 0) +
+        (qPTAX[0].p3 &&
+        qPTAX[0].d3 &&
+        qPTAX[0].d3.getTime() <= dateRef.toMillis()
+          ? 1
+          : 0) +
+        (qPTAX[0].p4 &&
+        qPTAX[0].d4 &&
+        qPTAX[0].d4.getTime() <= dateRef.toMillis()
+          ? 1
+          : 0);
+
+      ptax =
+        ((qPTAX[0].p1 &&
+        qPTAX[0].d1 &&
+        qPTAX[0].d1.getTime() <= dateRef.toMillis()
+          ? Number(qPTAX[0].p1)
+          : 0) +
+          (qPTAX[0].p2 &&
+          qPTAX[0].d2 &&
+          qPTAX[0].d2.getTime() <= dateRef.toMillis()
+            ? Number(qPTAX[0].p2)
+            : 0) +
+          (qPTAX[0].p3 &&
+          qPTAX[0].d3 &&
+          qPTAX[0].d3.getTime() <= dateRef.toMillis()
+            ? Number(qPTAX[0].p3)
+            : 0) +
+          (qPTAX[0].p4 &&
+          qPTAX[0].d4 &&
+          qPTAX[0].d4.getTime() <= dateRef.toMillis()
+            ? Number(qPTAX[0].p4)
+            : 0)) /
+        prevQty;
+    }
 
     /* if (!qPTAX || qPTAX.length === 0 || Number(qPTAX[0].ptax) === 0)
       return undefined;
@@ -486,10 +573,10 @@ export default class QueryOptions extends Query {
     return {
       contract,
       traded:
-        qFRP && qFRP.length > 0 && contractType === TContract.CURRENT
+        qFRP && qFRP.length > 0 && contractType === TContractType.CURRENT
           ? {
-              pmo: qFRP[0].pmo,
-              vwap: qFRP[0].vwap,
+              pmo: +Number(qFRP[0].pmo).toFixed(2),
+              vwap: +Number(qFRP[0].vwap).toFixed(2),
             }
           : undefined,
       calculated: {
@@ -498,10 +585,10 @@ export default class QueryOptions extends Query {
           iDI1_close > 0 &&
           iDDI_close &&
           iDDI_close > 0 &&
-          qPTAX[0] &&
-          Number(qPTAX[0].ptax) > 0
+          ptax &&
+          Number(ptax) > 0
             ? +Number(
-                Number(qPTAX[0].ptax) * (iDI1_close / iDDI_close - 1) * 1000,
+                Number(ptax) * (iDI1_close / iDDI_close - 1) * 1000,
               ).toFixed(2)
             : undefined,
         settle_d1:
@@ -509,10 +596,10 @@ export default class QueryOptions extends Query {
           iDI1_settle > 0 &&
           iDDI_settle &&
           iDDI_settle > 0 &&
-          qPTAX[0] &&
-          Number(qPTAX[0].ptax) > 0
+          ptax &&
+          Number(ptax) > 0
             ? +Number(
-                Number(qPTAX[0].ptax) * (iDI1_settle / iDDI_settle - 1) * 1000,
+                Number(ptax) * (iDI1_settle / iDDI_settle - 1) * 1000,
               ).toFixed(2)
             : undefined,
       },
@@ -523,7 +610,6 @@ export default class QueryOptions extends Query {
 export {
   QueryOptions,
   TFRPCalculationType,
-  TContract,
   IContract,
   IFRP,
   IOIOptionsBorders,

@@ -1,10 +1,11 @@
 /* eslint-disable import/newline-after-import */
 /* eslint-disable import/first */
-import dotenv from 'dotenv';
+/* import dotenv from 'dotenv';
 import { Logger } from 'tslog';
 import { DateTime } from 'luxon';
 dotenv.config();
-import TelegramBot, { TUserType } from './bot/telegramBot';
+import TelegramBot from './bot/telegramBot';
+import { TUserType } from './bot/baseBot';
 import queryFactory from './db/queryFactory';
 import TimesAndSalesB3 from './controllers/loaders/timesAndSalesB3';
 import GlobalParameters from './controllers/loaders/globalParameters';
@@ -14,11 +15,12 @@ import { TExchange } from './controllers/tcountry';
   await queryFactory.initialize(true);
   await GlobalParameters.init(queryFactory, true);
   const logger = new Logger();
-  const bot = new TelegramBot(
-    process.env.TELEGRAM_BOT_TOKEN || '',
-    queryFactory,
-    logger,
-  );
+  const bot = new TelegramBot(queryFactory, logger, {
+    BOT_USERNAME: process.env.TELEGRAM_BOT_USERNAME || '',
+    MAX_MESSAGE_SIZE: process.env.TELEGRAM_MAX_MESSAGE_SIZE
+      ? Number(process.env.TELEGRAM_MAX_MESSAGE_SIZE)
+      : undefined,
+  });
 
   process.env.B3_TIMESNSALES_ASSETS_REGEX = '';
   const ts = new TimesAndSalesB3(
@@ -41,7 +43,7 @@ import { TExchange } from './controllers/tcountry';
     const msgStart = `B3 - ${dt.toFormat(
       'dd/MM/yyyy',
     )} TIMES AND SALES STARTED - ${new Date()}`;
-    await bot.sendMessageToUsers(TUserType.OWNER, msgStart, {});
+    await bot.sendMessageToUsers(TUserType.OWNER, msgStart);
     logger.info(msgStart);
 
     const res = await ts.process({ dateRef: dt });
@@ -49,10 +51,11 @@ import { TExchange } from './controllers/tcountry';
     const msgEnd = `B3 - ${dt.toFormat(
       'dd/MM/yyyy',
     )} TIMES AND SALES FINISHED: ${JSON.stringify(res)} - ${new Date()}`;
-    await bot.sendMessageToUsers(TUserType.OWNER, msgEnd, {});
+    await bot.sendMessageToUsers(TUserType.OWNER, msgEnd);
     logger.info(msgEnd);
   }
   // process.stdin.emit('SIGINT');
   process.kill(process.pid, 'SIGINT');
   process.exit(0);
 })();
+ */

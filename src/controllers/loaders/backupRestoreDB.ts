@@ -7,7 +7,7 @@ import CloudFileManager from '../cloudFileManager';
 import { TCountryCode } from '../tcountry';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
 import ReportLoader, { ILoadResult } from '../reportLoader';
-import { TUserType } from '../../bot/telegramBot';
+import { TUserType } from '../../bot/baseBot';
 import { TLoadStatus } from '../task';
 
 export default class BackupRestoreDB extends ReportLoader {

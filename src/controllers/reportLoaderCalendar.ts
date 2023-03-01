@@ -180,7 +180,28 @@ abstract class ReportLoaderCalendar extends ReportLoader {
 
     return `${symbol[1]}${year}`;
   }
+
+  public static async isPayroll(
+    dateRef: DateTime,
+    queryFactory: QueryFactory,
+  ): Promise<boolean> {
+    if (dateRef.weekday === 5 && dateRef.day < 8) {
+      const qCalendar = await queryFactory.runQuery(
+        `SELECT date, event FROM "economic-calendar" 
+        WHERE date=$1 AND "country-code" = $2 AND LOWER(event) like $3 AND importance = $4`,
+        {
+          date: dateRef.toJSDate(),
+          country: TCountryCode.US,
+          event: '%payroll%',
+          importance: 3,
+        },
+      );
+
+      if (qCalendar && qCalendar.length > 0) return true;
+    }
+    return false;
+  }
 }
 
 export default ReportLoaderCalendar;
-export { TTimezone };
+export { TTimezone, TCountryCode };

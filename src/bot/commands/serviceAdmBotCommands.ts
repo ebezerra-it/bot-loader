@@ -6,13 +6,9 @@ import ejs from 'ejs';
 import { DateTime } from 'luxon';
 import validate from 'deep-email-validator';
 import { parseExpression } from 'cron-parser';
-import { isNumber, loadJSONFile } from '../../controllers/utils';
-import BaseBotCommands from './baseBotCommands';
-import TelegramBot, {
-  TUserType,
-  TUserReturnAuthType,
-  Message,
-} from '../telegramBot';
+import { isNumber } from '../../controllers/utils';
+import BaseBotCommands, { IBotCommandMessage } from './baseBotCommands';
+import BaseBot, { TUserType, TUserReturnAuthType } from '../baseBot';
 import GlobalParameters, {
   IGlobalParameter,
 } from '../../controllers/loaders/globalParameters';
@@ -22,54 +18,54 @@ import CloudFileManager from '../../controllers/cloudFileManager';
 export default class ServiceAdmBotCommands extends BaseBotCommands {
   messages: any;
 
-  constructor(bot: TelegramBot) {
+  constructor(bot: BaseBot) {
     super(bot);
 
     this.botCommands.push({
       name: 'help',
       regEx: new RegExp(/^\/help(\s.*)?/gi),
-      procedure: this.help,
+      procedure: this.help.bind(this),
     });
     this.botCommands.push({
       name: 'start',
       regEx: new RegExp(/^\/start(.*)$/g),
-      procedure: this.start,
+      procedure: this.start.bind(this),
     });
     this.botCommands.push({
       name: 'tracelog',
       regEx: new RegExp(/^\/tracelog(\sON|\sOFF)?$/gi),
-      procedure: this.tracelog,
+      procedure: this.tracelog.bind(this),
     });
     this.botCommands.push({
       name: 'loadstatus',
       regEx: new RegExp(/^\/loadstatus(\sLAST|\s\d\d\/\d\d\/\d\d\d\d)?/gi),
-      procedure: this.loadstatus,
+      procedure: this.loadstatus.bind(this),
     });
     this.botCommands.push({
       name: 'schedule',
       regEx: new RegExp(
         /\/schedule (SHOW$|ON|OFF|MAXINSTANCES=([0-9])\s([A-Za-z0-9_-]+$))[\s|$]?([A-Za-z0-9_-]+$)?/gi,
       ),
-      procedure: this.schedule,
+      procedure: this.schedule.bind(this),
     });
     this.botCommands.push({
       name: 'user',
       regEx: new RegExp(/\/user(.*)/gi),
-      procedure: this.user,
+      procedure: this.user.bind(this),
     });
     this.botCommands.push({
       name: 'reprocess',
       regEx: new RegExp(
         /^\/reprocess "(.*)" (\d\d\/\d\d\/\d\d\d\d)(\s\d\d\/\d\d\/\d\d\d\d)?$/i,
       ),
-      procedure: this.reprocess,
+      procedure: this.reprocess.bind(this),
     });
     this.botCommands.push({
       name: 'globalparam',
       regEx: new RegExp(
         /^\/globalparam(\sSHOW$|\s(UPDT)\s([A-Za-z0-9_-]+)=(.+))?$/gi,
       ),
-      procedure: this.globalparam,
+      procedure: this.globalparam.bind(this),
     });
     this.botCommands.push({
       name: 'restoredbbkp',
@@ -77,27 +73,15 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
         //        /^\/restoredbbkp\s([A-Za-z0-9_-]+)\s(\d\d\/\d\d\/\d\d\d\d)\s(.*)$/gi,
         /^\/restoredbbkp\s([A-Za-z0-9_-]+)\s(\d\d\/\d\d\/\d\d\d\d)$/gi,
       ),
-      procedure: this.restoredbbkp,
+      procedure: this.restoredbbkp.bind(this),
     });
 
-    loadJSONFile(path.join(__dirname, '../../../', 'config/', 'messages.json'))
-      .then(json => {
-        this.messages = json;
-        if (!this.messages || Object.keys(this.messages).length === 0)
-          throw new Error(
-            `[BOT-ServiceAdmCommands] Empty 'config/messages.json' file`,
-          );
-      })
-      .catch(e => {
-        throw new Error(
-          `[BOT-ServiceAdmCommands] Error found in 'config/messages.json' file: ${e.message}`,
-        );
-      });
+    this.readCommandMessages('serviceAdm');
   }
 
-  private async help(msg: Message): Promise<void> {
-    const { cmdAllowed, user } = await this.checkAuth(
-      msg,
+  private async help(msg: IBotCommandMessage): Promise<void> {
+    const { cmdAllowed, user } = await this.bot.checkBotUserAuth(
+      { username: msg.username },
       TUserType.DEFAULT,
       true,
     );
@@ -112,17 +96,19 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       `${path.resolve(`${__dirname}/../templates`)}/${help}.ejs`,
       {},
     );
-    await this.bot.sendMessage(user.chatId, html, {
-      parse_mode: 'HTML',
+    await this.bot.sendMessage(html, {
+      chatId: user.chatId,
+      replyToMessageId: msg.replyToMessageId,
+      parseMode: 'HTML',
     });
   }
 
   private async start(
-    msg: Message,
+    msg: IBotCommandMessage,
     match?: RegExpExecArray | null,
   ): Promise<void> {
-    const { cmdAllowed, authType, user } = await this.checkAuth(
-      msg,
+    const { cmdAllowed, authType, user } = await this.bot.checkBotUserAuth(
+      { username: msg.username },
       TUserType.DEFAULT,
       true,
     );
@@ -143,8 +129,8 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
     if (!args || args.length === 0) {
       // Update ChatId
-      if (msg.chat.id !== user.chatId && msg.chat.id) {
-        user.chatId = msg.chat.id;
+      if (msg.chatId !== user.chatId && msg.chatId) {
+        user.chatId = msg.chatId;
         await this.bot.queryFactory.runQuery(
           `UPDATE users SET "chat-id"=$2 WHERE id=$1`,
           { id: user.id, chatId: user.chatId },
@@ -155,7 +141,7 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
         if (qToken && qToken.length > 0) {
           if (
             qToken[0].emailtrials <
-            parseInt(process.env.USER_TOKEN_MAX_EMAIL_TRIALS || '1')
+            parseInt(process.env.BOT_USER_TOKEN_MAX_EMAIL_TRIALS || '1')
           ) {
             const errToken = await this.bot.sendUserTokenEmail(
               user,
@@ -163,10 +149,12 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
             );
             if (errToken) {
               await this.bot.sendMessage(
-                user.chatId,
-                `${this.messages.MSG_TOKEN_ERROR} ${errToken.message}`,
+                `${this.getCommandMessage('MSG_TOKEN_ERROR')} ${
+                  errToken.message
+                }`,
                 {
-                  reply_to_message_id: msg.message_id,
+                  chatId: user.chatId,
+                  replyToMessageId: msg.replyToMessageId,
                 },
               );
               return;
@@ -177,18 +165,18 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
               { userid: user.id, token: qToken[0].token, emailtrials },
             );
             await this.bot.sendMessage(
-              user.chatId,
-              this.messages.MSG_TOKEN_SENT,
+              this.getCommandMessage('MSG_TOKEN_SENT'),
               {
-                reply_to_message_id: msg.message_id,
+                chatId: user.chatId,
+                replyToMessageId: msg.replyToMessageId,
               },
             );
           } else {
             await this.bot.sendMessage(
-              msg.chat.id,
-              this.messages.MSG_TOKEN_MAX_SEND_TRIALS,
+              this.getCommandMessage('MSG_TOKEN_MAX_SEND_TRIALS'),
               {
-                reply_to_message_id: msg.message_id,
+                chatId: msg.chatId,
+                replyToMessageId: msg.replyToMessageId,
               },
             );
           }
@@ -199,17 +187,15 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
             { userid: user.id, token },
           );
           await this.bot.sendUserTokenEmail(user, token);
-          await this.bot.sendMessage(
-            user.chatId,
-            this.messages.MSG_TOKEN_SENT,
-            {
-              reply_to_message_id: msg.message_id,
-            },
-          );
+          await this.bot.sendMessage(this.getCommandMessage('MSG_TOKEN_SENT'), {
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
+          });
         }
       } else {
-        await this.bot.sendMessage(msg.chat.id, this.messages.MSG_TOKEN_VALID, {
-          reply_to_message_id: msg.message_id,
+        await this.bot.sendMessage(this.getCommandMessage('MSG_TOKEN_VALID'), {
+          chatId: msg.chatId,
+          replyToMessageId: msg.replyToMessageId,
         });
       }
     } else if (
@@ -219,12 +205,13 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
         String(qToken[0].token) === String(args[0])
       )
     ) {
-      await this.bot.sendMessage(msg.chat.id, this.messages.MSG_TOKEN_INVALID, {
-        reply_to_message_id: msg.message_id,
+      await this.bot.sendMessage(this.getCommandMessage('MSG_TOKEN_INVALID'), {
+        chatId: msg.chatId,
+        replyToMessageId: msg.replyToMessageId,
       });
     } else {
       const expires = DateTime.now().plus({
-        hours: parseInt(process.env.USER_TOKEN_EXPIRING_HOURS || '8'),
+        hours: parseInt(process.env.BOT_USER_TOKEN_EXPIRING_HOURS || '8'),
       });
 
       await this.bot.queryFactory.runQuery(
@@ -232,10 +219,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
         { userid: user.id, token: qToken[0].token, expires },
       );
       await this.bot.sendMessage(
-        msg.chat.id,
-        this.messages.MSG_TOKEN_VALIDATED,
+        this.getCommandMessage('MSG_TOKEN_VALIDATED'),
         {
-          reply_to_message_id: msg.message_id,
+          chatId: msg.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
 
@@ -243,18 +230,19 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
         `${path.resolve(`${__dirname}/../templates`)}/welcome.ejs`,
         { user: user.name },
       );
-      await this.bot.sendMessage(user.chatId, html, {
-        parse_mode: 'HTML',
+      await this.bot.sendMessage(html, {
+        chatId: user.chatId,
+        parseMode: 'HTML',
       });
     }
   }
 
   private async tracelog(
-    msg: Message,
+    msg: IBotCommandMessage,
     match?: RegExpExecArray | null,
   ): Promise<void> {
-    const { cmdAllowed, user } = await this.checkAuth(
-      msg,
+    const { cmdAllowed, user } = await this.bot.checkBotUserAuth(
+      { username: msg.username },
       TUserType.ADMINISTRATOR,
       true,
     );
@@ -275,10 +263,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       else if (args[0] === 'OFF') tracelog = false;
       else {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_SINTAX,
+          this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: msg.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -296,29 +284,29 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
     }
     if (!updated || parseInt(updated) === 0) {
       await this.bot.sendMessage(
-        msg.chat.id,
-        this.messages.MSG_COMMAND_EMPTY_DATA,
+        this.getCommandMessage('MSG_COMMAND_EMPTY_DATA'),
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
     } else {
       await this.bot.sendMessage(
-        msg.chat.id,
-        this.messages.MSG_COMMAND_SUCCESS,
+        this.getCommandMessage('MSG_COMMAND_SUCCESS'),
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
     }
   }
 
   private async loadstatus(
-    msg: Message,
+    msg: IBotCommandMessage,
     match?: RegExpExecArray | null,
   ): Promise<void> {
-    const { cmdAllowed, user } = await this.checkAuth(
-      msg,
+    const { cmdAllowed, user } = await this.bot.checkBotUserAuth(
+      { username: msg.username },
       TUserType.DEFAULT,
       true,
     );
@@ -341,10 +329,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       if (qLoad) dtRef = DateTime.fromJSDate(qLoad[0].dtref);
       else {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_EMPTY_DATA,
+          this.getCommandMessage('MSG_COMMAND_EMPTY_DATA'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -353,10 +341,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       dtRef = DateTime.fromFormat(args[0], 'dd/MM/yyyy');
       if (!dtRef.isValid) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_DATE,
+          this.getCommandMessage('MSG_COMMAND_INVALID_DATE'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -375,32 +363,32 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
     if (!qLoad || qLoad.length < 1) {
       await this.bot.sendMessage(
-        msg.chat.id,
-        this.messages.MSG_COMMAND_EMPTY_DATA,
+        this.getCommandMessage('MSG_COMMAND_EMPTY_DATA'),
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
       return;
     }
 
     await this.bot.sendMessage(
-      msg.chat.id,
-      `${this.messages.MSG_COMMAND_LOADSTATUS} ${dtRef.toFormat(
+      `${this.getCommandMessage('MSG_COMMAND_LOADSTATUS')} ${dtRef.toFormat(
         'dd/MM/yyyy',
-      )}: \n${TelegramBot.printJSON(qLoad)}`,
+      )}: \n${BaseBot.printJSON(qLoad)}`,
       {
-        reply_to_message_id: msg.message_id,
+        chatId: user.chatId,
+        replyToMessageId: msg.replyToMessageId,
       },
     );
   }
 
   private async schedule(
-    msg: Message,
+    msg: IBotCommandMessage,
     match?: RegExpExecArray | null,
   ): Promise<void> {
-    const { cmdAllowed, user } = await this.checkAuth(
-      msg,
+    const { cmdAllowed, user } = await this.bot.checkBotUserAuth(
+      { username: msg.username },
       TUserType.ADMINISTRATOR,
       true,
     );
@@ -421,10 +409,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
       if (!qLoad || qLoad.length < 1) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_EMPTY_DATA,
+          this.getCommandMessage('MSG_COMMAND_EMPTY_DATA'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -441,12 +429,12 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       });
 
       await this.bot.sendMessage(
-        msg.chat.id,
-        `${this.messages.MSG_COMMAND_SCHEDULE_SHOW}\n${TelegramBot.printJSON(
-          res,
-        )}`,
+        `${this.getCommandMessage(
+          'MSG_COMMAND_SCHEDULE_SHOW',
+        )}\n${BaseBot.printJSON(res)}`,
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
       return;
@@ -468,20 +456,23 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
       if (!updated || parseInt(updated) === 0) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_EMPTY_DATA,
+          this.getCommandMessage('MSG_COMMAND_EMPTY_DATA'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
       }
 
       await this.bot.sendMessage(
-        msg.chat.id,
-        this.messages.MSG_COMMAND_SCHEDULE_ON.replace('$1', updated),
+        this.getCommandMessage('MSG_COMMAND_SCHEDULE_ON').replace(
+          '$1',
+          updated,
+        ),
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
       return;
@@ -503,20 +494,23 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
       if (!updated || parseInt(updated) === 0) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_EMPTY_DATA,
+          this.getCommandMessage('MSG_COMMAND_EMPTY_DATA'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
       }
 
       await this.bot.sendMessage(
-        msg.chat.id,
-        this.messages.MSG_COMMAND_SCHEDULE_OFF.replace('$1', updated),
+        this.getCommandMessage('MSG_COMMAND_SCHEDULE_OFF').replace(
+          '$1',
+          updated,
+        ),
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
       return;
@@ -525,10 +519,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
     if (args[0].match(/MAXINSTANCES=[0-9]\s[A-Za-z0-9_-]+$/gi)) {
       if (user.type < TUserType.OWNER) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_ACCESS_DENIED,
+          this.getCommandMessage('MSG_ACCESS_DENIED'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -541,10 +535,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
         );
       } else {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_SINTAX,
+          this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -552,39 +546,39 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
       if (!updated || parseInt(updated) === 0) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_EMPTY_DATA,
+          this.getCommandMessage('MSG_COMMAND_EMPTY_DATA'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
       }
 
       await this.bot.sendMessage(
-        msg.chat.id,
-        this.messages.MSG_COMMAND_SCHEDULE_MAXINSTANCES,
+        this.getCommandMessage('MSG_COMMAND_SCHEDULE_MAXINSTANCES'),
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
     } else {
       await this.bot.sendMessage(
-        msg.chat.id,
-        this.messages.MSG_COMMAND_INVALID_SINTAX,
+        this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
     }
   }
 
   private async user(
-    msg: Message,
+    msg: IBotCommandMessage,
     match?: RegExpExecArray | null,
   ): Promise<void> {
-    const { cmdAllowed, user } = await this.checkAuth(
-      msg,
+    const { cmdAllowed, user } = await this.bot.checkBotUserAuth(
+      { username: msg.username },
       TUserType.OWNER,
       true,
     );
@@ -607,10 +601,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
       if (!qLoad || qLoad.length < 1) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_EMPTY_DATA,
+          this.getCommandMessage('MSG_COMMAND_EMPTY_DATA'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -628,10 +622,12 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       });
 
       await this.bot.sendMessage(
-        msg.chat.id,
-        `${this.messages.MSG_COMMAND_USER_SHOW}\n${TelegramBot.printJSON(res)}`,
+        `${this.getCommandMessage(
+          'MSG_COMMAND_USER_SHOW',
+        )}\n${BaseBot.printJSON(res)}`,
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
       return;
@@ -655,10 +651,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
         ).valid
       ) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_SINTAX,
+          this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -673,10 +669,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       );
       if (qUsers && qUsers.length > 0) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_SINTAX,
+          this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -695,10 +691,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       // TO DO: Send email to user
 
       await this.bot.sendMessage(
-        msg.chat.id,
-        this.messages.MSG_COMMAND_USER_CREATED,
+        this.getCommandMessage('MSG_COMMAND_USER_CREATED'),
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
       return;
@@ -707,21 +703,21 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
     if (args[0].toUpperCase() === 'ON' || args[0].toUpperCase() === 'OFF') {
       if (args.length < 2) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_SINTAX,
+          this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
       }
-      const upUser = (await this.bot.getUser({ username: args[1] })).user;
+      const upUser = (await this.bot.getBotUser({ username: args[1] })).user;
       if (!upUser || upUser.type === TUserType.OWNER) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_SINTAX,
+          this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -739,11 +735,12 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
       const MSG =
         args[0].toUpperCase() === 'ON'
-          ? this.messages.MSG_COMMAND_USER_ON
-          : this.messages.MSG_COMMAND_USER_OFF;
+          ? this.getCommandMessage('MSG_COMMAND_USER_ON')
+          : this.getCommandMessage('MSG_COMMAND_USER_OFF');
 
-      await this.bot.sendMessage(msg.chat.id, MSG, {
-        reply_to_message_id: msg.message_id,
+      await this.bot.sendMessage(MSG, {
+        chatId: user.chatId,
+        replyToMessageId: msg.replyToMessageId,
       });
       return;
     }
@@ -757,10 +754,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
         (args[0].toUpperCase() === 'UNBAN' && args.length < 2)
       ) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_SINTAX,
+          this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -794,10 +791,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
           banneduntil.toMillis() < DateTime.now().toMillis()
         ) {
           await this.bot.sendMessage(
-            msg.chat.id,
-            this.messages.MSG_COMMAND_INVALID_SINTAX,
+            this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
             {
-              reply_to_message_id: msg.message_id,
+              chatId: user.chatId,
+              replyToMessageId: msg.replyToMessageId,
             },
           );
           return;
@@ -805,13 +802,13 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       } else {
         banneduntil = null;
       }
-      const upUser = (await this.bot.getUser({ username: args[1] })).user;
+      const upUser = (await this.bot.getBotUser({ username: args[1] })).user;
       if (!upUser || upUser.type === TUserType.OWNER) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_SINTAX,
+          this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -826,10 +823,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
       if (!updated || parseInt(updated) === 0) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_EMPTY_DATA,
+          this.getCommandMessage('MSG_COMMAND_EMPTY_DATA'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -839,11 +836,12 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
       const MSG =
         args[0].toUpperCase() === 'BAN'
-          ? this.messages.MSG_COMMAND_USER_BAN
-          : this.messages.MSG_COMMAND_USER_UNBAN;
+          ? this.getCommandMessage('MSG_COMMAND_USER_BAN')
+          : this.getCommandMessage('MSG_COMMAND_USER_UNBAN');
 
-      await this.bot.sendMessage(msg.chat.id, MSG, {
-        reply_to_message_id: msg.message_id,
+      await this.bot.sendMessage(MSG, {
+        chatId: user.chatId,
+        replyToMessageId: msg.replyToMessageId,
       });
       return;
     }
@@ -854,43 +852,41 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
     ) {
       if (args.length < 2) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_SINTAX,
+          this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
       }
-      const upUser = (await this.bot.getUser({ username: args[1] })).user;
+      const upUser = (await this.bot.getBotUser({ username: args[1] })).user;
       if (!upUser || upUser.type === TUserType.OWNER) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_SINTAX,
+          this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
       }
 
-      let type;
-      let MSG_USER;
-      let MSG_ADM;
+      let type: TUserType;
+      let MSG_USER: string;
+      let MSG_ADM: string;
       if (args[0].toUpperCase() === 'PROMOTE') {
         type = TUserType.ADMINISTRATOR;
-        MSG_USER = this.messages.MSG_COMMAND_USER_PROMOTED;
-        MSG_ADM = this.messages.MSG_COMMAND_ADM_PROMOTED.replace(
-          '$1',
-          user.username,
-        ).replace('$2', args[1]);
+        MSG_USER = this.getCommandMessage('MSG_COMMAND_USER_PROMOTED');
+        MSG_ADM = this.getCommandMessage('MSG_COMMAND_ADM_PROMOTED')
+          .replace('$1', user.username)
+          .replace('$2', args[1]);
       } else {
         type = TUserType.DEFAULT;
-        MSG_USER = this.messages.MSG_COMMAND_USER_DEMOTED;
-        MSG_ADM = this.messages.MSG_COMMAND_ADM_DEMOTED.replace(
-          '$1',
-          user.username,
-        ).replace('$2', args[1]);
+        MSG_USER = this.getCommandMessage('MSG_COMMAND_USER_DEMOTED');
+        MSG_ADM = this.getCommandMessage('MSG_COMMAND_ADM_DEMOTED')
+          .replace('$1', user.username)
+          .replace('$2', args[1]);
       }
 
       const [, updated] = await this.bot.queryFactory.runQuery(
@@ -903,10 +899,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
       if (!updated || parseInt(updated) === 0) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_EMPTY_DATA,
+          this.getCommandMessage('MSG_COMMAND_EMPTY_DATA'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -914,21 +910,22 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
       // TO DO: Send email to user
 
-      await this.bot.sendMessage(msg.chat.id, MSG_USER, {
-        reply_to_message_id: msg.message_id,
+      await this.bot.sendMessage(MSG_USER, {
+        chatId: user.chatId,
+        replyToMessageId: msg.replyToMessageId,
       });
 
       // Inform administrators
-      await this.bot.sendMessageToUsers(TUserType.OWNER, MSG_ADM, {});
+      await this.bot.sendMessageToUsers(TUserType.OWNER, MSG_ADM);
     }
   }
 
   private async reprocess(
-    msg: Message,
+    msg: IBotCommandMessage,
     match?: RegExpExecArray | null,
   ): Promise<void> {
-    const { cmdAllowed, user } = await this.checkAuth(
-      msg,
+    const { cmdAllowed, user } = await this.bot.checkBotUserAuth(
+      { username: msg.username },
       TUserType.ADMINISTRATOR,
       true,
     );
@@ -953,10 +950,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
           (!dtRefTo || !dtRefTo.isValid || dtRefFrom > dtRefTo))
       ) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          this.messages.MSG_COMMAND_INVALID_DATE,
+          this.getCommandMessage('MSG_COMMAND_INVALID_DATE'),
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -977,12 +974,12 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       );
       if (invSch && invSch.length > 0) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          `${this.messages.MSG_REPROCESS_INVALID_SCHEDULES} ${invSch.join(
-            ', ',
-          )}.`,
+          `${this.getCommandMessage(
+            'MSG_REPROCESS_INVALID_SCHEDULES',
+          )} ${invSch.join(', ')}.`,
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -1003,10 +1000,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
           });
         } catch (err) {
           await this.bot.sendMessage(
-            msg.chat.id,
-            this.messages.MSG_COMMAND_INVALID_CRON_SCHEDULE,
+            this.getCommandMessage('MSG_COMMAND_INVALID_CRON_SCHEDULE'),
             {
-              reply_to_message_id: msg.message_id,
+              chatId: user.chatId,
+              replyToMessageId: msg.replyToMessageId,
             },
           );
           return;
@@ -1059,28 +1056,28 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
         }
       }
       await this.bot.sendMessage(
-        msg.chat.id,
-        `${this.messages.MSG_REPROCESS_CREATED} ${inserted}.`,
+        `${this.getCommandMessage('MSG_REPROCESS_CREATED')} ${inserted}.`,
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
       return;
     }
     await this.bot.sendMessage(
-      msg.chat.id,
-      this.messages.MSG_COMMAND_INVALID_SINTAX,
+      this.getCommandMessage('MSG_COMMAND_INVALID_SINTAX'),
       {
-        reply_to_message_id: msg.message_id,
+        chatId: user.chatId,
+        replyToMessageId: msg.replyToMessageId,
       },
     );
   }
 
   private async globalparam(
-    msg: Message,
+    msg: IBotCommandMessage,
     match?: RegExpExecArray | null,
   ): Promise<void> {
-    const { cmdAllowed, user } = await this.checkAuth(
+    const { cmdAllowed, user } = await this.bot.checkBotUserAuth(
       msg,
       TUserType.OWNER,
       true,
@@ -1098,10 +1095,12 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       );
 
       await this.bot.sendMessage(
-        msg.chat.id,
-        `${this.messages.MSG_GLOBALVAR_SHOW}\n${TelegramBot.printJSON(params)}`,
+        `${this.getCommandMessage('MSG_GLOBALVAR_SHOW')}\n${BaseBot.printJSON(
+          params,
+        )}`,
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
       return;
@@ -1116,28 +1115,32 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       )
     ) {
       await this.bot.sendMessage(
-        msg.chat.id,
-        `${this.messages.MSG_GLOBALVAR_UPDATED}: ${args[2]}=${args[3]}`,
+        `${this.getCommandMessage('MSG_GLOBALVAR_UPDATED')}: ${args[2]}=${
+          args[3]
+        }`,
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
     } else {
       await this.bot.sendMessage(
-        msg.chat.id,
-        `${this.messages.MSG_GLOBALVAR_NOT_UPDATED}: ${args[2]}=${args[3]}`,
+        `${this.getCommandMessage('MSG_GLOBALVAR_NOT_UPDATED')}: ${args[2]}=${
+          args[3]
+        }`,
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
     }
   }
 
   private async restoredbbkp(
-    msg: Message,
+    msg: IBotCommandMessage,
     match?: RegExpExecArray | null,
   ): Promise<void> {
-    const { cmdAllowed, user } = await this.checkAuth(
+    const { cmdAllowed, user } = await this.bot.checkBotUserAuth(
       msg,
       TUserType.OWNER,
       true,
@@ -1155,10 +1158,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
     if (!dateRef.isValid) {
       await this.bot.sendMessage(
-        msg.chat.id,
-        `${this.messages.MSG_COMMAND_INVALID_DATE}: ${args[1]}`,
+        `${this.getCommandMessage('MSG_COMMAND_INVALID_DATE')}: ${args[1]}`,
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
       return;
@@ -1173,10 +1176,12 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       ))
     ) {
       await this.bot.sendMessage(
-        msg.chat.id,
-        `${this.messages.MSG_RETOREBKPDB_FILE_NOTFOUND}: ${args[1]}`,
+        `${this.getCommandMessage('MSG_RETOREBKPDB_FILE_NOTFOUND')}: ${
+          args[1]
+        }`,
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
       return;
@@ -1192,10 +1197,12 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
 
       if (!qTables || !qTables.find((t: any) => t.table === restoreTable)) {
         await this.bot.sendMessage(
-          msg.chat.id,
-          `${this.messages.MSG_RETOREBKPDB_TABLE_NOTFOUND}: ${args[0]}`,
+          `${this.getCommandMessage('MSG_RETOREBKPDB_TABLE_NOTFOUND')}: ${
+            args[0]
+          }`,
           {
-            reply_to_message_id: msg.message_id,
+            chatId: user.chatId,
+            replyToMessageId: msg.replyToMessageId,
           },
         );
         return;
@@ -1217,10 +1224,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
       Number(qSchedule[0].active) === 0
     ) {
       await this.bot.sendMessage(
-        msg.chat.id,
-        `${this.messages.MSG_RETOREBKPDB_SCHEDULE_NOTACTIVE}`,
+        `${this.getCommandMessage('MSG_RETOREBKPDB_SCHEDULE_NOTACTIVE')}`,
         {
-          reply_to_message_id: msg.message_id,
+          chatId: user.chatId,
+          replyToMessageId: msg.replyToMessageId,
         },
       );
       return;
@@ -1243,10 +1250,10 @@ export default class ServiceAdmBotCommands extends BaseBotCommands {
     );
 
     await this.bot.sendMessage(
-      msg.chat.id,
-      `${this.messages.MSG_RETOREBKPDB_SCHEDULED}: ${args[0]}`,
+      `${this.getCommandMessage('MSG_RETOREBKPDB_SCHEDULED')}: ${args[0]}`,
       {
-        reply_to_message_id: msg.message_id,
+        chatId: user.chatId,
+        replyToMessageId: msg.replyToMessageId,
       },
     );
   }

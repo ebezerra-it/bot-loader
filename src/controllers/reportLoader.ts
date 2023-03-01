@@ -2,7 +2,10 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { Logger } from 'tslog';
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
+import https, { Agent } from 'https';
+import fs from 'fs';
+import path from 'path';
 import { DateTime } from 'luxon';
 import { QueryFactory } from '../db/queryFactory';
 import { TCountryCode, getExchanges } from './tcountry';
@@ -30,10 +33,21 @@ abstract class ReportLoader {
 
   queryFactory: QueryFactory;
 
+  api: AxiosInstance;
+
+  httpsAgent: Agent;
+
   constructor(processName: string, logger: Logger, queryFactory: QueryFactory) {
     this.processName = processName;
     this.logger = logger;
     this.queryFactory = queryFactory;
+    this.api = axios.create();
+    this.httpsAgent = new https.Agent({
+      requestCert: true,
+      ca: fs.readFileSync(path.join(__dirname, '../../cert/web/cert.pem')),
+      rejectUnauthorized: true,
+      keepAlive: false,
+    });
   }
 
   abstract performQuery(params: any): Promise<any>;
@@ -95,7 +109,7 @@ abstract class ReportLoader {
     try {
       const res = await this.retry(
         {
-          url: `http://localhost:${
+          url: `https://localhost:${
             process.env.TELEGRAM_API_PORT || '8001'
           }/sendmsg`,
           postData: {
@@ -129,7 +143,7 @@ abstract class ReportLoader {
     try {
       const res = await this.retry(
         {
-          url: `http://localhost:${
+          url: `https://localhost:${
             process.env.TELEGRAM_API_PORT || '8001'
           }/event`,
           postData: {
@@ -159,6 +173,7 @@ abstract class ReportLoader {
       method: 'post',
       url: queryParams.url,
       data: queryParams.postData,
+      httpsAgent: this.httpsAgent,
       headers: { 'Content-Type': 'application/json' },
     });
   }

@@ -192,8 +192,9 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
 
     res = await this.updateAssetsExpiryTables(params.dateRef);
 
-    await this.queryFactory.runQuery(`TRUNCATE TABLE "b3-assets-expiry"`, {});
-    await this.queryFactory.runQuery(`VACUUM(FULL) "b3-assets-expiry"`, {});
+    // KEEP DATA IN DB FOR TRYDLOADER USING
+    /* await this.queryFactory.runQuery(`TRUNCATE TABLE "b3-assets-expiry"`, {});
+    await this.queryFactory.runQuery(`VACUUM(FULL) "b3-assets-expiry"`, {}); */
 
     return res;
   }
@@ -597,7 +598,7 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
                     row.asstqtnqty !== '' ? Number(row.asstqtnqty) : undefined,
                   quoteMultiplier:
                     row.ctrctmltplr !== ''
-                      ? Number(row.ctrctmltplr)
+                      ? Number(row.ctrctmltplr) || undefined
                       : undefined,
                   optionType: undefined,
                   optionStyle: undefined,
@@ -654,7 +655,7 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
                     row.asstqtnqty !== '' ? Number(row.asstqtnqty) : undefined,
                   quoteMultiplier:
                     row.ctrctmltplr !== ''
-                      ? Number(row.ctrctmltplr)
+                      ? Number(row.ctrctmltplr) || undefined
                       : undefined,
                   optionType: undefined,
                   optionStyle: undefined,
@@ -739,7 +740,7 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
                     row.asstqtnqty !== '' ? Number(row.asstqtnqty) : undefined,
                   quoteMultiplier:
                     row.ctrctmltplr !== ''
-                      ? Number(row.ctrctmltplr)
+                      ? Number(row.ctrctmltplr) || undefined
                       : undefined,
                   optionType,
                   optionStyle,
@@ -819,7 +820,7 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
                     row.asstqtnqty !== '' ? Number(row.asstqtnqty) : undefined,
                   quoteMultiplier:
                     row.ctrctmltplr !== ''
-                      ? Number(row.ctrctmltplr)
+                      ? Number(row.ctrctmltplr) || undefined
                       : undefined,
                   optionType: undefined,
                   optionStyle: undefined,
@@ -1000,6 +1001,24 @@ export default class AssetsExpiryB3 extends ReportLoaderCalendar {
         }@${process.env.DB_HOST || 'dbhost'}:${process.env.DB_PORT || '3211'}/${
           process.env.DB_NAME || 'dbname'
         }`,
+        ssl: {
+          rejectUnauthorized: false,
+          ca: fs
+            .readFileSync(
+              path.join(__dirname, '../../../', '/cert/db', 'root.crt'),
+            )
+            .toString(),
+          key: fs
+            .readFileSync(
+              path.join(__dirname, '../../../', '/cert/db', 'client.key'),
+            )
+            .toString(),
+          cert: fs
+            .readFileSync(
+              path.join(__dirname, '../../../', '/cert/db', 'client.crt'),
+            )
+            .toString(),
+        },
       });
 
       pool.connect((pgErr, client, done) => {

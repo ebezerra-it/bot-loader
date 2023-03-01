@@ -1,0 +1,51 @@
+{
+    DOL VPOC backtest indicator
+    Author: t.me/edubbulhoes
+  }
+  input
+    ShowTrend(true);
+    TrendMaxDiff(50.0);
+  var 
+    dt: Array[0..<%= qte %>] of Integer;
+    fVWAP: Array[0..<%= qte %>] of Float;
+    fVolume: Array[0..<%= qte %>] of Float;
+
+    fDiffPoints: Float;
+    qte, i: Integer;
+    fOpen: Float;
+begin
+<% for(var i=0; i<qte; i++) { %>
+    dt[<%= i %>] := <%= dolvpoc[i].date %>;
+    fVWAP[<%= i %>] := <%= dolvpoc[i].vwap %>;
+    fVolume[<%= i %>] := <%= dolvpoc[i].volume %>;
+<% } %>
+    qte := <%= qte %>;
+
+    if (date >= dt[0]) then
+    begin
+        for i:=0 to qte do
+        begin
+            if (date = dt[i]) then
+            begin
+                if (ShowTrend) then
+                begin
+                    fOpen := OpenD(0);
+                    fDiffPoints := fVWAP[i] - fOpen;
+                    if (Abs(fDiffPoints) >= TrendMaxDiff) then
+                        setPlotColor(1, clGray)
+                    else
+                        if (fDiffPoints > 0) then
+                            setPlotColor(1, clGreen)
+                        else
+                            setPlotColor(1, clRed);
+
+                    plot(fDiffPoints);
+                end
+                else
+                begin
+                    plot(fVWAP[i]);
+                end;
+            end;
+        end;
+    end;
+end;

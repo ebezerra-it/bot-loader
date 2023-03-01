@@ -77,8 +77,8 @@ export default class customFunctionsDatatypes1654180851412
         group by level
         order by level asc; 
 
-        select 1.qtty as volume, 1.mean as vwap, 1.sd as sd from 
-        (select stddev_combine(volume, vwap, sigma) from "b3-ts-summary" where asset = 'DOLZ21' and volume>0 and "timestamp-open"::DATE = '2021-11-08') q;  
+        select (comb).qtty as volume, (comb).mean as vwap, (comb).sd as sd from 
+        (select stddev_combine(volume, vwap, sigma) comb from "b3-ts-summary" where asset = 'DOLZ21' and volume>0 and "timestamp-open"::DATE = '2021-11-08') q;  
     */
     // Statistics - end
   }

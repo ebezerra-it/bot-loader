@@ -6,7 +6,8 @@ import jsonminify from 'jsonminify';
 import { DateTime } from 'luxon';
 import ReportLoader, { ILoadResult } from '../reportLoader';
 import { QueryFactory } from '../../db/queryFactory';
-import TelegramBot, { IUser } from '../../bot/telegramBot';
+import TelegramBot from '../../bot/telegramBot';
+import { IUser } from '../../bot/baseBot';
 
 interface IGlobalParameter {
   key: string;
@@ -161,10 +162,9 @@ class GlobalParameters extends ReportLoader {
 
     if (qParams && qParams.length > 0) {
       for await (const p of qParams) {
-        const { user } = await TelegramBot.getUser(
-          { id: p.lastupdateuser },
-          queryfactory,
-        );
+        const { user } = await TelegramBot.getBotUser(queryfactory, {
+          id: p.lastupdateuser,
+        });
 
         globalParameters.push({
           key: p.key,

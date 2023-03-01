@@ -11,7 +11,7 @@ import childprocess from 'child_process';
 import MyLogger from '../../controllers/myLogger';
 import { QueryFactory } from '../queryFactory';
 import GlobalParameters from '../../controllers/loaders/globalParameters';
-import { TUserType } from '../../bot/telegramBot';
+import { TUserType } from '../../bot/baseBot';
 import DataFileLoader, {
   LAYOUT_PROFIT_ROLLING_TT,
   LAYOUT_PROFIT_1M,
@@ -113,6 +113,24 @@ export default class firstdataload1652845346716 implements MigrationInterface {
       }@${process.env.DB_HOST || 'dbhost'}:${process.env.DB_PORT || '3211'}/${
         process.env.DB_NAME || 'dbname'
       }`,
+      ssl: {
+        rejectUnauthorized: false,
+        ca: fs
+          .readFileSync(
+            path.join(__dirname, '../../../', '/cert/db', 'root.crt'),
+          )
+          .toString(),
+        key: fs
+          .readFileSync(
+            path.join(__dirname, '../../../', '/cert/db', 'client.key'),
+          )
+          .toString(),
+        cert: fs
+          .readFileSync(
+            path.join(__dirname, '../../../', '/cert/db', 'client.crt'),
+          )
+          .toString(),
+      },
     });
 
     logger.info(`[First data loading] Loading users table`);

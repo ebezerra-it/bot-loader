@@ -16,11 +16,22 @@ import ZipFileManager from '../zipFileManager';
 import CloudFileManager from '../cloudFileManager';
 import { TDataOrigin } from '../../db/migrations/1634260181468-tbl_b3_ts_summary';
 
+interface ITimesAndSalesLegacy {
+  timestamp: DateTime;
+  asset: string;
+  level: number;
+  size: number;
+  tradeId: string;
+  updt: number;
+}
+
 interface ITimesAndSales {
   timestamp: DateTime;
   asset: string;
   level: number;
   size: number;
+  buyerId: number;
+  sellerId: number;
   tradeId: string;
   updt: number;
 }
@@ -270,6 +281,24 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
       }@${process.env.DB_HOST || 'dbhost'}:${process.env.DB_PORT || '3211'}/${
         process.env.DB_NAME || 'dbname'
       }`,
+      ssl: {
+        rejectUnauthorized: false,
+        ca: fs
+          .readFileSync(
+            path.join(__dirname, '../../../', '/cert/db', 'root.crt'),
+          )
+          .toString(),
+        key: fs
+          .readFileSync(
+            path.join(__dirname, '../../../', '/cert/db', 'client.key'),
+          )
+          .toString(),
+        cert: fs
+          .readFileSync(
+            path.join(__dirname, '../../../', '/cert/db', 'client.crt'),
+          )
+          .toString(),
+      },
     });
 
     return new Promise((resolve, reject) => {
@@ -293,36 +322,82 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
           .on('data', row => {
             read++;
 
-            const ts: ITimesAndSales = {
-              timestamp: DateTime.fromFormat(
-                `${row.RptDt} ${row.NtryTm}`,
-                'yyyy-MM-dd HHmmssSSS',
-                { zone: this.exchange.timezone },
-              ),
-              asset: row.TckrSymb,
-              level: parseFloat(String(row.GrssTradAmt).replace(/,/g, '.')),
-              size: parseInt(row.TradQty),
-              tradeId: row.TradId,
-              updt: parseInt(row.UpdActn),
-            };
+            if (row.RptDt) {
+              const ts: ITimesAndSalesLegacy = {
+                timestamp: DateTime.fromFormat(
+                  `${row.RptDt} ${row.NtryTm}`,
+                  'yyyy-MM-dd HHmmssSSS',
+                  { zone: this.exchange.timezone },
+                ),
+                asset: row.TckrSymb,
+                level: parseFloat(String(row.GrssTradAmt).replace(/,/g, '.')),
+                size: parseInt(row.TradQty),
+                tradeId: row.TradId,
+                updt: parseInt(row.UpdActn),
+              };
 
-            if (assets.some(a => new RegExp(`${a}`).test(ts.asset))) {
-              pgStream.write(
-                `${ts.timestamp.toISO()};${ts.asset};${ts.level};${ts.size};${
-                  ts.tradeId
-                };${ts.updt}\n`,
+              if (assets.some(a => new RegExp(`${a}`).test(ts.asset))) {
+                pgStream.write(
+                  `${ts.timestamp.toISO()};${ts.asset};${ts.level};${ts.size};${
+                    ts.tradeId
+                  };${ts.updt}\n`,
+                );
+                inserted++;
+              }
+            } else if (row.DataReferencia) {
+              // new file layout deployed in 22/02/2023
+              const ts: ITimesAndSales = {
+                timestamp: DateTime.fromFormat(
+                  `${row.DataReferencia} ${row.HoraFechamento}`,
+                  'yyyy-MM-dd HHmmssSSS',
+                  { zone: this.exchange.timezone },
+                ),
+                asset: row.CodigoInstrumento,
+                level: parseFloat(String(row.PrecoNegocio).replace(/,/g, '.')),
+                size: parseInt(row.QuantidadeNegociada),
+                tradeId: row.CodigoIdentificadorNegocio,
+                updt: parseInt(row.AcaoAtualizacao),
+                buyerId: parseInt(row.CodigoParticipanteComprador),
+                sellerId: parseInt(row.CodigoParticipanteVendedor),
+              };
+
+              if (assets.some(a => new RegExp(`${a}`).test(ts.asset))) {
+                pgStream.write(
+                  `${ts.timestamp.toISO()};${ts.asset};${ts.level};${ts.size};${
+                    ts.tradeId
+                  };${ts.updt}\n`,
+                );
+                inserted++;
+              }
+            } else {
+              throw new Error(
+                `[${
+                  this.processName
+                }] dbLoadCSVTSFile() - Unknown file layout: ${Object.keys(
+                  row,
+                ).join(', ')}`,
               );
-              inserted++;
             }
           })
           .on('end', async () => {
+            this.logger.info(
+              `[${
+                this.processName
+              }] dbLoadCSVTSFile() - Records read: ${read} - inserted: ${inserted} - ignored: ${
+                read - inserted
+              }`,
+            );
             pgStream.end();
             done();
             resolve({ inserted, deleted: 0 });
           })
           .on('error', error => {
             this.logger.error(
-              `[${this.processName}] - Records read / inserted: ${read} / ${inserted} - Error: ${error.message}`,
+              `[${
+                this.processName
+              }] dbLoadCSVTSFile() - Records read: ${read} - inserted: ${inserted} - ignored: ${
+                read - inserted
+              } - Error: ${error.message}`,
             );
 
             pgStream.end();
@@ -482,6 +557,10 @@ class TimesAndSalesB3 extends ReportLoaderCalendar {
     dateRef: DateTime,
     origin: number,
   ): Promise<ILoadResult> {
+    this.logger.silly(
+      `[${this.processName}] summarizeTSData() - Summarizing data`,
+    );
+
     let inserted = 0;
     const [, deleted] = await this.queryFactory.runQuery(
       `DELETE FROM "b3-ts-summary" WHERE "timestamp-open"::DATE=$1::DATE AND origin<>${TDataOrigin.PROFIT_LOADER}`,

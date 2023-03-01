@@ -76,7 +76,7 @@ class OIPlayersB3 extends ReportLoaderCalendar {
     return this.getB3Report(params.dateRef);
   }
 
-  private getAsset(caption: string): IAsset | undefined {
+  private async getAsset(caption: string): Promise<IAsset | undefined> {
     const asset = this.assets.find(
       a =>
         a.caption
@@ -87,7 +87,30 @@ class OIPlayersB3 extends ReportLoaderCalendar {
           .replace(/[^A-Z0-9&\(\)]|[-]/g, '') ===
         caption.replace(/[^A-Z0-9&\(\)]|[-]/g, ''),
     );
-    return asset || undefined;
+
+    if (asset) return asset;
+
+    // Stocks futures
+    const re = new RegExp(/^(CONTRATO )?FUTURO DE ([A-Z0-9]{4}[3|4])$/gi);
+    const match = re.exec(caption);
+    if (match && match[2]) {
+      const qAsset = await this.queryFactory.runQuery(
+        `SELECT "underlying-asset" code, "product-name" caption, type  FROM "b3-assets-expiry" WHERE "product-name" LIKE $1 LIMIT 1`,
+        {
+          asset: `%FUTURO DE ${match[2]}`,
+        },
+      );
+
+      if (qAsset && qAsset.length > 0) {
+        return {
+          code: qAsset[0].code,
+          caption,
+          type: qAsset[0].type,
+        };
+      }
+    }
+
+    return undefined;
   }
 
   async performQuery(params: { url: string; postData?: any }): Promise<any> {
@@ -154,7 +177,7 @@ class OIPlayersB3 extends ReportLoaderCalendar {
         .trim();
 
       if (!sCaption || sCaption === '') continue;
-      const Asset = this.getAsset(sCaption);
+      const Asset = await this.getAsset(sCaption);
       let assetCode: string | undefined;
       let assetType: TAssetType | undefined;
       if (!Asset) {

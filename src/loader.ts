@@ -1,13 +1,12 @@
 import { Logger } from 'tslog';
-
-import TelegramBot from './bot/telegramBot';
+import BaseBot from './bot/baseBot';
 import { QueryFactory } from './db/queryFactory';
 import TaskManager from './controllers/taskManager';
 
 export default class Loader {
   queryfactory: QueryFactory;
 
-  bot: TelegramBot;
+  bot: BaseBot;
 
   logger: Logger;
 
@@ -15,7 +14,7 @@ export default class Loader {
 
   isRunning: boolean;
 
-  constructor(queryfactory: QueryFactory, bot: TelegramBot, logger: Logger) {
+  constructor(queryfactory: QueryFactory, bot: BaseBot, logger: Logger) {
     this.queryfactory = queryfactory;
     this.bot = bot;
     this.logger = logger;

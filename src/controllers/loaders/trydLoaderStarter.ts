@@ -1,9 +1,10 @@
-import fs from 'fs';
-import path from 'path';
 import { DateTime } from 'luxon';
 import { ILoadResult } from '../reportLoader';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
-import VMCommands, { IVMCommandReturn } from '../../bot/commands/vmCommands';
+import VMCommands, {
+  IVMCommandReturn,
+  TVMCommandType,
+} from '../../bot/commands/vmCommands';
 
 export default class TrydLoaderStarter extends ReportLoaderCalendar {
   async process(params: { dateRef: DateTime }): Promise<ILoadResult> {
@@ -13,28 +14,72 @@ export default class TrydLoaderStarter extends ReportLoaderCalendar {
       }] - Process started - DateRef: ${params.dateRef.toFormat('dd/MM/yyyy')}`,
     );
 
-    const VM_PATH_TO_PIPE2HOST_FILE = path.join(
-      process.env.VM_PIPE2HOST_CONT_DIR || '',
-      process.env.VM_PIPE2HOST_FILENAME || '',
-    );
+    let commandReturn: IVMCommandReturn;
 
-    const vmCommand = `VMSTART VM_NAME=${process.env.VM_NAME} VM_HOST_NAME=${process.env.VM_HOST_NAME} VM_HOST_IP=${process.env.VM_HOST_IP} VM_USER=${process.env.VM_USER} VM_PASS='${process.env.VM_PASS}' VM_SNAPSHOT_START=${process.env.VM_SNAPSHOT_START} VM_FILESYSTEM_XML_PATH=${process.env.VM_FILESYSTEM_XML_PATH} DB_PORT=${process.env.DB_PORT} DB_NAME=${process.env.DB_NAME} DB_USER=${process.env.DB_USER} DB_PASS='${process.env.DB_PASS}' TELEGRAM_API_PORT=${process.env.TELEGRAM_API_PORT}`;
-    fs.appendFileSync(VM_PATH_TO_PIPE2HOST_FILE, vmCommand);
+    commandReturn = await this.retry({
+      vmCommandType: TVMCommandType.STATUS,
+    });
 
-    const commandReturn: IVMCommandReturn = await VMCommands.waitForVMCommand(
-      vmCommand,
-    );
+    if (commandReturn.vmstatus && commandReturn.vmstatus.state === 'running') {
+      commandReturn = await this.retry({
+        vmCommandType: TVMCommandType.STOP,
+      });
+    }
 
-    if (commandReturn.status !== 'success')
-      throw new Error(
-        `Unable to start TrydLoaderStarter process due to error: ${commandReturn.message}`,
+    commandReturn = await this.retry({
+      vmCommandType: TVMCommandType.START,
+    });
+
+    if (!commandReturn || commandReturn.status !== 'success') {
+      await this.queryFactory.runQuery(
+        `UPDATE "loadcontrol" SET status=$3, result=$4, "finished-at"=$5 
+      WHERE "date-ref"::DATE=$1::DATE AND process=$2`,
+        {
+          dateRef: params.dateRef.toJSDate(),
+          process: this.processName,
+          status: 'DONE',
+          result: { inserted: -1, deleted: 0 },
+          finished: new Date(),
+        },
       );
+      throw new Error(
+        `Maximum ${Number(
+          process.env.TRYDLOADER_STARTER_MAX_RETRIES || '5',
+        )} retries reached.\nUnable to start TrydLoaderStarter process due to error: ${JSON.stringify(
+          commandReturn,
+        )}`,
+      );
+    }
 
     return { inserted: 1, deleted: 0 };
   }
 
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  async performQuery(_params: any): Promise<any> {
-    return undefined;
+  async performQuery(params: {
+    vmCommandType: TVMCommandType;
+  }): Promise<IVMCommandReturn> {
+    let commandReturn: IVMCommandReturn;
+
+    switch (params.vmCommandType) {
+      case TVMCommandType.START:
+        commandReturn = await VMCommands.sendVMCommand(TVMCommandType.START);
+        break;
+      case TVMCommandType.STOP:
+        commandReturn = await VMCommands.sendVMCommand(TVMCommandType.STOP);
+        break;
+      case TVMCommandType.STATUS:
+        commandReturn = await VMCommands.sendVMCommand(TVMCommandType.STATUS);
+        break;
+      default:
+        throw new Error(
+          `[${this.processName}] Unknown VM command: ${params.vmCommandType}`,
+        );
+    }
+
+    if (commandReturn.status !== 'success')
+      throw new Error(
+        `[${this.processName}] Failed to run VM command: ${params.vmCommandType} due to error: ${commandReturn.message}`,
+      );
+
+    return commandReturn;
   }
 }

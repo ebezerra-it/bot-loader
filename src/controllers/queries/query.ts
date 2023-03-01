@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-import TelegramBot from '../../bot/telegramBot';
+import BaseBot from '../../bot/baseBot';
 import { QueryFactory } from '../../db/queryFactory';
 
 abstract class Query {
-  bot: TelegramBot;
+  bot: BaseBot;
 
   queryFactory: QueryFactory;
 
-  constructor(bot: TelegramBot) {
+  constructor(bot: BaseBot) {
     this.bot = bot;
     this.queryFactory = bot.queryFactory;
   }

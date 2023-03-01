@@ -2,7 +2,8 @@
 /* eslint-disable no-param-reassign */
 import { DateTime } from 'luxon';
 import Query from './query';
-import TelegramBot, { TUserType } from '../../bot/telegramBot';
+import BaseBot, { TUserType } from '../../bot/baseBot';
+import ReportLoaderCalendar, { TCountryCode } from '../reportLoaderCalendar';
 
 interface IAssetWeight {
   asset: string;
@@ -40,47 +41,70 @@ class QueryPlayers extends Query {
     chatId?: number;
     messageId?: number;
   }): Promise<boolean> {
-    let resPlayers;
-    let msgHeader;
-    if (params.dateFrom) {
-      resPlayers = await this.getPlayersBalDates(
-        params.dateFrom,
-        params.dateTo,
-        params.assets,
-      );
-      msgHeader = `Players Balance - Date-1: ${params.dateFrom.toFormat(
-        'dd/MM/yyyy',
-      )} / Date-2: ${params.dateTo.toFormat('dd/MM/yyyy')}\n`;
-    } else {
-      resPlayers = await this.getPlayersBalance(params.dateTo, params.assets);
-      msgHeader = `Players Balance - Date: ${params.dateTo.toFormat(
-        'dd/MM/yyyy',
-      )}\n`;
-    }
+    const dtFrom = await ReportLoaderCalendar.subTradeDays(
+      this.queryFactory,
+      params.dateFrom || DateTime.now(),
+      1,
+      TCountryCode.BR,
+    );
+
+    const dtTo = await ReportLoaderCalendar.subTradeDays(
+      this.queryFactory,
+      params.dateTo ? params.dateTo : dtFrom,
+      1,
+      TCountryCode.BR,
+    );
+
+    const resPlayers = await this.getPlayersBalDates(
+      dtFrom,
+      dtTo,
+      params.assets,
+    );
+    const msgHeader = `Players Balance - Date-1: ${dtFrom.toFormat(
+      'dd/MM/yyyy',
+    )} / Date-2: ${dtTo.toFormat('dd/MM/yyyy')}\n`;
 
     let botResponse;
-
-    if (resPlayers) botResponse = TelegramBot.printJSON(resPlayers);
+    if (resPlayers) botResponse = BaseBot.printJSON(resPlayers);
     else botResponse = 'Not enought data.';
 
     if (params.chatId) {
-      this.bot.sendMessage(
-        params.chatId,
-        `${msgHeader}${botResponse}`,
-        params.messageId
-          ? { reply_to_message_id: params.messageId }
-          : undefined,
-      );
+      this.bot.sendMessage(`${msgHeader}${botResponse}`, {
+        chatId: params.chatId,
+        replyToMessageId: params.messageId ? params.messageId : undefined,
+      });
     } else {
       this.bot.sendMessageToUsers(
         TUserType.DEFAULT,
         botResponse,
-        {},
+        undefined,
         false,
         msgHeader,
       );
     }
     return !!resPlayers;
+  }
+
+  public async calculate(
+    assets: IAssetWeight[],
+    dateFrom: DateTime | undefined,
+    dateTo?: DateTime,
+  ): Promise<IPosPlayersBalance | undefined> {
+    const dtFrom = await ReportLoaderCalendar.subTradeDays(
+      this.queryFactory,
+      dateFrom || DateTime.now(),
+      1,
+      TCountryCode.BR,
+    );
+
+    const dtTo = await ReportLoaderCalendar.subTradeDays(
+      this.queryFactory,
+      dateTo || dtFrom,
+      1,
+      TCountryCode.BR,
+    );
+
+    return this.getPlayersBalDates(dtFrom, dtTo, assets);
   }
 
   public async getPlayersBalance(
@@ -170,11 +194,6 @@ class QueryPlayers extends Query {
     assets: IAssetWeight[],
   ): Promise<IPosPlayersBalance | undefined> {
     if (assets.length === 0) throw new Error(`Empty assets list.`);
-    if (
-      dateFrom.startOf('day').toMillis() >= dateTo.startOf('day').toMillis()
-    ) {
-      throw new Error(`Parameter Date-From MUST BE after Date-To.`);
-    }
 
     const aSQL: string[] = [];
     assets.forEach(a => {

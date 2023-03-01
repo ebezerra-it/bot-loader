@@ -1,6 +1,6 @@
 /* eslint-disable camelcase */
 import { DateTime } from 'luxon';
-import TelegramBot, { TUserType } from '../../bot/telegramBot';
+import BaseBot, { TUserType } from '../../bot/baseBot';
 import Query from './query';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
 import { TCountryCode } from '../tcountry';
@@ -77,10 +77,10 @@ export default class QueryFRP0 extends Query {
     }
 
     let botResponse;
-    if (aFRP0.length > 0) botResponse = TelegramBot.printJSON(aFRP0);
+    if (aFRP0.length > 0) botResponse = BaseBot.printJSON(aFRP0);
     else botResponse = 'Not enought data.';
 
-    const msgHeader = `PTAX USD - Date From: ${dateFrom.toFormat(
+    const msgHeader = `FRP0 - Date From: ${dateFrom.toFormat(
       'dd/MM/yyyy',
     )} - Date To: ${dateTo.toFormat('dd/MM/yyyy')}\n`;
 
@@ -88,18 +88,15 @@ export default class QueryFRP0 extends Query {
       this.bot.sendMessageToUsers(
         TUserType.DEFAULT,
         botResponse,
-        {},
+        undefined,
         false,
         msgHeader,
       );
     } else {
-      this.bot.sendMessage(
-        params.chatId,
-        `${msgHeader}${botResponse}`,
-        params.messageId
-          ? { reply_to_message_id: params.messageId }
-          : undefined,
-      );
+      this.bot.sendMessage(`${msgHeader}${botResponse}`, {
+        chatId: params.chatId,
+        replyToMessageId: params.messageId ? params.messageId : undefined,
+      });
     }
     return !!(aFRP0.length > 0);
   }
@@ -159,20 +156,39 @@ export default class QueryFRP0 extends Query {
     }
 
     if (!tradedFRP || !prefD1FRP1) {
-      // frp0 d0.open
       qFRP = await queryFactory.runQuery(
         `SELECT 
-        "timestamp-open"::DATE date, open
+        "timestamp-open"::DATE date,
+        (MAX(high) + MIN(low))/2 pmo, 
+        (stddev_combine(volume, vwap, sigma)).mean vwap  
         FROM "b3-ts-summary" 
-        WHERE asset='FRP0' AND "timestamp-open"::DATE=$1::DATE
-        ORDER BY "timestamp-open"::DATE ASC
+        WHERE asset = 'FRP0' AND 
+        "timestamp-open"<$1 AND "timestamp-open"::DATE=$1::DATE
+        GROUP BY "timestamp-open"::DATE
+        ORDER BY "timestamp-open"::DATE DESC
         LIMIT 1`,
         {
           dateRef: dateRef.toJSDate(),
         },
       );
+
       if (qFRP && qFRP.length > 0)
-        tradedFRP = { vwap: Number(qFRP[0].open), pmo: Number(qFRP[0].open) };
+        tradedFRP = { vwap: Number(qFRP[0].pmo), pmo: Number(qFRP[0].vwap) };
+      else {
+        qFRP = await queryFactory.runQuery(
+          `SELECT 
+          datetime::DATE date, (high + low)/2 pmo, vwap
+          FROM "b3-assetsquotes" 
+          WHERE asset='FRP0' AND datetime::DATE=$1::DATE AND datetime<$1
+          ORDER BY datetime DESC
+          LIMIT 1`,
+          {
+            dateRef: dateRef.toJSDate(),
+          },
+        );
+        if (qFRP && qFRP.length > 0)
+          tradedFRP = { vwap: Number(qFRP[0].vwap), pmo: Number(qFRP[0].pmo) };
+      }
     }
 
     let contract = await QueryFRP0.getContractCode(

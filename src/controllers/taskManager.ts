@@ -360,8 +360,8 @@ class TaskManager extends EventEmitter {
     if (this.mainJob) this.mainJob.start();
     if (this.reprocessJob) this.reprocessJob.start();
 
-    this.logger.info(
-      `[LOADER] - Service started: ${DateTime.now().toFormat('dd/MM/yyyy')}`,
+    this.logger.warn(
+      `[TaskManager] Service started: ${DateTime.now().toFormat('dd/MM/yyyy')}`,
     );
   }
 
@@ -370,7 +370,7 @@ class TaskManager extends EventEmitter {
     if (this.mainJob) this.mainJob.stop();
     if (this.reprocessJob) this.reprocessJob.stop();
 
-    this.logger.fatal(`[LOADER] - Service stoped due to: ${msg}`);
+    this.logger.fatal(`[TaskManager] Service stoped due to: ${msg}`);
 
     const jobsStatus = this.loaderjobs.map(j => {
       return {
@@ -387,7 +387,7 @@ class TaskManager extends EventEmitter {
       };
     });
     this.logger.fatal(
-      `[LOADER] - Jobs status:\n${JSON.stringify(jobsStatus, null, 4)}`,
+      `[TaskManager] Jobs status:\n${JSON.stringify(jobsStatus, null, 4)}`,
     );
     this.emit('stoped', msg);
   }
@@ -475,12 +475,18 @@ class TaskManager extends EventEmitter {
                 }
               } catch (e) {}
             }
-            const task = new Task(loaderjob!.name, loaderjob!.reportLoader, {
+
+            const params = {
               dateRef,
               dateMatch: DateTime.fromJSDate(proc.datematch),
               restoreTable,
               lastTaskOfDay: true,
-            });
+            };
+            const task = new Task(
+              loaderjob!.name,
+              loaderjob!.reportLoader,
+              params,
+            );
 
             try {
               loaderjob.instancesRunning++;
@@ -509,11 +515,13 @@ class TaskManager extends EventEmitter {
               this.logger.error(
                 `[${
                   loaderjob!.name
-                } - REPROCESS - DateRef: ${DateTime.fromJSDate(
-                  proc.dateRef,
-                ).toFormat('dd/MM/yyyy')}] Execution aborted due to error: ${
-                  e.message
-                }`,
+                } TASK ERROR - DateRef: ${DateTime.fromJSDate(
+                  proc.dateref,
+                ).toFormat(
+                  'dd/MM/yyyy',
+                )}] Task reprocessing with params: ${JSON.stringify(
+                  params,
+                )} aborted due to error: ${JSON.stringify(e)}`,
               );
             } finally {
               loaderjob.instancesRunning--;
@@ -587,19 +595,22 @@ class TaskManager extends EventEmitter {
       return;
     }
 
-    const task = new Task(loaderjob!.name, loaderjob!.reportLoader, {
+    const params = {
       dateRef,
       dateMatch,
       lastTaskOfDay,
-    });
+    };
+    const task = new Task(loaderjob!.name, loaderjob!.reportLoader, params);
     try {
       loaderjob.instancesRunning++;
       await task.process();
     } catch (e) {
       this.logger.error(
-        `[${loaderjob!.name} - DateRef: ${dateRef.toFormat(
+        `[${loaderjob!.name}] TASK ERROR - DateRef: ${dateRef.toFormat(
           'dd/MM/yyyy',
-        )}] Task processing aborted due to error: ${JSON.stringify(e)}`,
+        )} - Task processing with params: ${JSON.stringify(
+          params,
+        )} aborted due to error: ${JSON.stringify(e)}`,
       );
     } finally {
       loaderjob.instancesRunning--;

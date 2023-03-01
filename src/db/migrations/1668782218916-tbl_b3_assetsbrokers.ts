@@ -1,12 +1,12 @@
 import { MigrationInterface, QueryRunner, Table, TableIndex } from 'typeorm';
 
-export default class tblB3Brokersbalance1659394131573
+export default class tblB3Assetsbrokers1668782218916
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.createTable(
       new Table({
-        name: 'b3-brokersbalance',
+        name: 'b3-assetsbrokers',
         columns: [
           {
             name: 'datetime',
@@ -33,9 +33,15 @@ export default class tblB3Brokersbalance1659394131573
             name: 'vwap',
             type: 'numeric',
             precision: 12,
-            scale: 2,
+            scale: 3,
             isNullable: false,
             unsigned: true,
+          },
+          {
+            name: 'auction',
+            type: 'boolean',
+            isNullable: false,
+            default: false,
           },
         ],
         foreignKeys: [
@@ -50,19 +56,19 @@ export default class tblB3Brokersbalance1659394131573
     );
 
     await queryRunner.createIndex(
-      'b3-brokersbalance',
+      'b3-assetsbrokers',
       new TableIndex({
-        name: '7c825efe-1f4c-4df8-b9d7-9b6103aec421',
-        columnNames: ['datetime', 'asset', 'broker-id'],
+        name: 'a9644ff9-3d97-4c17-9ca7-95fc39c44dbb',
+        columnNames: ['datetime', 'asset', 'broker-id', 'auction'],
       }),
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.dropIndex(
-      'b3-brokersbalance',
-      '7c825efe-1f4c-4df8-b9d7-9b6103aec421',
+      'b3-assetsbrokers',
+      'a9644ff9-3d97-4c17-9ca7-95fc39c44dbb',
     );
-    await queryRunner.dropTable('b3-brokersbalance', true, true, true);
+    await queryRunner.dropTable('b3-assetsbrokers', true, true, true);
   }
 }

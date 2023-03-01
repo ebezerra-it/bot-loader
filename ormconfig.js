@@ -1,3 +1,5 @@
+var { readFileSync } = require('fs');
+var { join } = require('path');
 var tsconfigParser = require('./tsconfigParser');
 var { envFolder, extension } = tsconfigParser(process.env.NODE_ENV);
 
@@ -17,11 +19,12 @@ module.exports={
       "migrationsDir": envFolder + "/db/migrations" 
    },
    migrationsTransactionMode: 'each',
-   /* "ssl": {
-      "rejectUnauthorized": true,
-      ca: readFileSync(path.join(__dirname, '/cert', 'rootCA_CA.pem')).toString(),
-      key: readFileSync(path.join(__dirname, '/cert', 'localhost.key')).toString(),
-      cert: readFileSync(path.join(__dirname, '/cert', 'localhost.crt')).toString(),
-   } */
-
+   ssl: {
+      checkServerIdentity: () => {}, // skip host validation in certificate
+      sslmode: 'verify-ca',
+      rejectUnauthorized: true,
+      ca: readFileSync(join(__dirname, '/cert/db', 'root.crt'), 'utf-8').toString(),
+      key: readFileSync(join(__dirname, '/cert/db', 'client.key'), 'utf-8').toString(),
+      cert: readFileSync(join(__dirname, '/cert/db', 'client.crt'), 'utf-8').toString(),
+   },
 }

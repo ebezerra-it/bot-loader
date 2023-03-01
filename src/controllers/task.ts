@@ -132,13 +132,13 @@ class Task extends EventEmitter {
           return { ...results };
         })
         .catch(error => {
-          this.reportLoader.logger.error(
+          /* this.reportLoader.logger.error(
             `[${this.name}] - DateRef: ${this.params.dateRef.toFormat(
               'dd/MM/yyyy',
             )} - Params: ${JSON.stringify(
               this.params,
             )} - Error: ${JSON.stringify(error)}`,
-          );
+          ); */
           throw error;
         });
     }

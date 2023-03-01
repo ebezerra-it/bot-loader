@@ -1,6 +1,7 @@
 version: "3"
 
 services:
+  # BOT-LOADER Service
   myoraculum-botloader:
     image: myoraculum-botloader-image:${APP_VERSION}
     env_file:
@@ -8,25 +9,24 @@ services:
     build:
       context: ./
       dockerfile: PROD_Dockerfile
-    
     container_name: myoraculum-botloader
     volumes: 
       - myoraculum-botloader_log:/app/myoraculum-botloader/log:rw
       - ${VM_PIPE2HOST_HOST_DIR}:${VM_PIPE2HOST_CONT_DIR}:rw
       - ${VM_SCREENSHOTS_HOST_DIR}:${VM_SCREENSHOTS_CONT_DIR}:rw
-    
     restart: "no" #unless-stopped
-
     command: >
       bash -c "yarn prod:typeorm migration:run -t each
       && yarn start"
-
-    network_mode: service:myoraculum-postgres
-    
+    ports:
+      - ${TELEGRAM_API_PORT}:${TELEGRAM_API_PORT}
+    networks:
+      myoraculum_network:
     depends_on: 
       myoraculum-postgres:
         condition: service_healthy
 
+  # POSTGRES Service        
   myoraculum-postgres:
     image: myoraculum-postgres-image
     hostname: myoraculum-postgres
@@ -46,21 +46,22 @@ services:
       POSTGRES_DB: ${DB_NAME}
       PGDATA: /var/lib/postgresql/data
       PGPORT: ${DB_PORT}
-      HOST_ADDR: ${HOST_ADDR}
-    command: postgres -c hba_file=/var/lib/postgresql/pg_hba.conf -c ssl=on -c ssl_cert_file=/var/lib/postgresql/server.crt -c ssl_key_file=/var/lib/postgresql/server.key -c ssl_ca_file=/var/lib/postgresql/ca.crt
+    command: postgres -c hba_file=/var/lib/postgresql/pg_hba.conf -c ssl=on -c ssl_cert_file=/var/lib/postgresql/server.crt -c ssl_key_file=/var/lib/postgresql/server.key -c ssl_ca_file=/var/lib/postgresql/root.crt
     ports:
       - ${DB_PORT}:${DB_PORT}
-      - ${TELEGRAM_API_PORT}:${TELEGRAM_API_PORT}
-      - ${PROFIT_API_PORT}:${PROFIT_API_PORT}
     volumes: 
       - myoraculum-postgres_data:/var/lib/postgresql/data
     networks:
       myoraculum_network:
 
+
+# Persistent volumes
 volumes:
   myoraculum-postgres_data:
   myoraculum-botloader_log:
 
+
+# Bridge network
 networks:
   myoraculum_network:
     name: myoraculum-network

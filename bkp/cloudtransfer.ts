@@ -2,14 +2,15 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable import/newline-after-import */
 /* eslint-disable import/first */
-/* 
-import dotenv from 'dotenv';
+
+/* import dotenv from 'dotenv';
 import { Logger } from 'tslog';
 import path from 'path';
 import { DateTime } from 'luxon';
 import fs from 'fs';
 dotenv.config();
-import TelegramBot, { TUserType } from './bot/telegramBot';
+import TelegramBot from './bot/telegramBot';
+import { TUserType } from './bot/baseBot';
 import queryFactory from './db/queryFactory';
 import GlobalParameters from './controllers/loaders/globalParameters';
 import CloudFileManager from './controllers/cloudFileManager';
@@ -18,11 +19,12 @@ import CloudFileManager from './controllers/cloudFileManager';
   await queryFactory.initialize(true);
   await GlobalParameters.init(queryFactory);
   const logger = new Logger();
-  const bot = new TelegramBot(
-    process.env.TELEGRAM_BOT_TOKEN || '',
-    queryFactory,
-    logger,
-  );
+  const bot = new TelegramBot(queryFactory, logger, {
+    BOT_USERNAME: process.env.TELEGRAM_BOT_USERNAME || '',
+    MAX_MESSAGE_SIZE: process.env.TELEGRAM_MAX_MESSAGE_SIZE
+      ? Number(process.env.TELEGRAM_MAX_MESSAGE_SIZE)
+      : undefined,
+  });
   const cloud = new CloudFileManager();
   const oldCloud = new CloudFileManager(true);
 
@@ -84,7 +86,6 @@ import CloudFileManager from './controllers/cloudFileManager';
   await bot.sendMessageToUsers(
     TUserType.OWNER,
     `CloudTransfer ended - Files uploaded: ${count} => ${new Date()}`,
-    {},
   );
 
   // process.stdin.emit('SIGINT');

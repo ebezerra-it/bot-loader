@@ -1,0 +1,145 @@
+<html>
+    <head>
+        <title>MyOraculum - Asset quotes</title>
+        <link rel="stylesheet" type="text/css" href="/css/styles.css"/>
+        <script src="/js/luxon.min.js"></script>
+        <script>
+            const DateTime = luxon.DateTime;
+            let _ws;
+            let _user;
+            let _params;
+
+            function load() {
+                togglelive();
+                document.getElementById("logout").disabled = true;
+                const qs = window.location.search;
+                _params = new URLSearchParams(window.location.search);
+            }
+
+            function processWSMessage(event) {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'ERROR') {
+                        document.getElementById('error').innerHTML += `${new Date()} - ${msg.data.errorMessage}\n`;
+                    } else if (msg.type === 'DATA') {
+                        if (msg.data) {
+                            if (msg.data.vpoc) document.getElementById('vpoc').innerHTML = `${JSON.stringify(msg.data.vpoc, null, 4)}`;
+                            if (msg.data.ptaxd1) document.getElementById('ptaxd1').innerHTML = `${JSON.stringify(msg.data.ptaxd1, null, 4)}`;
+                            if (msg.data.spotsettle) document.getElementById('spotsettle').innerHTML = `${JSON.stringify(msg.data.spotsettle, null, 4)}`;
+                            if (msg.data.playersbal) document.getElementById('playersbal').innerHTML = `${JSON.stringify(msg.data.playersbal, null, 4)}`;
+                            if (msg.data.oivwap) document.getElementById('oivwap').innerHTML = `${JSON.stringify(msg.data.oivwap, null, 4)}`;
+                            if (msg.data.optionsvwap) document.getElementById('optionsvwap').innerHTML = `${JSON.stringify(msg.data.optionsvwap, null, 4)}`;
+                            if (msg.data.volatility) document.getElementById('volatility').innerHTML = `${JSON.stringify(msg.data.volatility, null, 4)}`;
+
+                            // Live updated data
+                            if (msg.data.ptaxavg) document.getElementById('ptaxavg').innerHTML = `${JSON.stringify(msg.data.ptaxavg, null, 4)}`;
+                            if (msg.data.ptaxd0) document.getElementById('ptaxd0').innerHTML = `${JSON.stringify(msg.data.ptaxd0, null, 4)}`;
+                            if (msg.data.brokersbal) document.getElementById('brokersbal').innerHTML = `${JSON.stringify(msg.data.brokersbal, null, 4)}`;
+                            if (msg.data.assetsquotes) document.getElementById('assetsquotes').innerHTML = `${JSON.stringify(msg.data.assetsquotes, null, 4)}`;
+                            if (msg.data.di1quotes) document.getElementById('di1quotes').innerHTML = `${JSON.stringify(msg.data.di1quotes, null, 4)}`;
+                            if (msg.data.assetsbooks) document.getElementById('assetsbooks').innerHTML = `${JSON.stringify(msg.data.assetsbooks, null, 4)}`;
+                            if (msg.data.spothired) document.getElementById('spothired').innerHTML = `${JSON.stringify(msg.data.spothired, null, 4)}`;
+                        }
+                    } else if (msg.type === 'PING') {
+                        document.getElementById('logs').innerHTML += `${new Date()} - PING: ${JSON.stringify(msg, null, 4)}\n`;
+                    }
+                } catch(err) {};
+            }
+
+            function connect() {
+                if (_ws && _ws.readyState === WebSocket.OPEN) {
+                    document.getElementById('logs').innerHTML += `${new Date()} - Client already connected\n`;
+                    return;
+                }
+                if (_user && _user.id && _user.hash && _user.username) {
+                    document.getElementById("logout").disabled = false;
+                    _ws = new WebSocket(`wss://<%= host %>/dolfut?user=${encodeURIComponent(JSON.stringify(_user))}&dateref=${DateTime.fromISO(document.getElementById('dateref').value).toMillis()}${_params && _params.toString() !== '' ? '&' + _params.toString() : ''}`, null, { rejectUnauthorized: true });
+                    document.getElementById('logs').innerHTML += `${new Date()} - Client connected\n`;
+                    _ws.onmessage = processWSMessage;
+
+                    _ws.onclose = () => {
+                        document.getElementById('logs').innerHTML += `${new Date()} - Client disconnected\n`;
+                        document.getElementById('logintg').style.display = 'initial';
+                    }
+                    document.getElementById('logintg').style.display = 'none';
+                } else {
+                    alert('You have to login first!');
+                }
+            }
+
+            function disconnect() {
+                if (_ws) {
+                    _ws.close();
+                    _ws = undefined;
+                }
+            }
+
+            function logout() {
+                if (_ws) disconnect();
+                _user = undefined;
+                document.getElementById("user").innerHTML = 'No user';
+            }
+
+            function togglelive() {
+                const dateref = document.getElementById('dateref');
+                if (document.getElementById('chklive').checked) {
+                    dateref.value = DateTime.fromISO(new Date().toISOString()).set({hour: 19, minute: 0, second: 0, millisecond: 0}).toISO().slice(0, 16);
+                    dateref.max = DateTime.fromISO(new Date().toISOString()).set({hour: 19, minute: 0, second: 0, millisecond: 0}).toISO().slice(0, 16);
+                    dateref.disabled = true;
+                } else {
+                    dateref.value = DateTime.fromISO(new Date().toISOString()).toISO().slice(0, 16);
+                    dateref.max = DateTime.fromISO(new Date().toISOString()).set({hour: 19, minute: 0, second: 0, millisecond: 0}).toISO().slice(0, 16);
+                    dateref.disabled = false;
+                }
+            }
+
+        </script>
+    </head>
+    <body onload="load()">
+        <div>
+            <div id="main">
+                <div class="controls">
+                    <h1>MyOraculum WebApp</h1>
+                    <div id="logintg">
+                        <p class="content">
+                            <script async src="https://telegram.org/js/telegram-widget.js?2" data-telegram-login="<%= botUserName %>" data-size="large" data-onauth="onTelegramAuth(user)" data-request-access="write"></script>
+                            <script type="text/javascript">
+                            function onTelegramAuth(user) {
+                                document.getElementById("user").innerHTML = `${user.photo_url ? `<img class="imguserphoto" src="${user.photo_url}?v=${new Date().getTime()}" /><br/>` : ''}UserId: ${user.id}<br>Name: ${user.first_name} ${user.last_name ? user.last_name : ''}<br>Username: ${user.username ? '@' + user.username : '' }<br>Hash: ${user.hash}<br>`;
+
+                                _user = user;
+                                document.getElementById('logs').innerHTML += `${new Date()} - User logged in: ${JSON.stringify(_user, null, 4)}\n`;
+                            }
+                            </script>
+                        </p>
+                    </div>
+                    <br/>
+                    <p class="content" id="user">No user</p>
+                    <br/>
+                    <p class="content">Ref. date: <input id="dateref" type="datetime-local" disabled><input id="chklive" type="checkbox" onclick="togglelive()" checked>Live</p>
+                    <br/>
+                    <p class="content">[<a href="#" onclick="connect()">Connect</a>] | [<a href="#" onclick="disconnect()">Disconnect</a>] | [<a id="logout" href="#" onclick="logout()">Logout</a>]</p>
+                </div>
+
+                <div class="cerror"><p class="caption">Error messages:</p><p class="content"><pre><code id="error"></code></pre></p></div>
+                <div class="live"><p class="caption">PTAX average analisys:</p><p class="content"><pre><code id="ptaxavg"></code></pre></p></div>
+                <div class="live"><p class="caption">PTAX D-0 analisys:</p><p class="content"><pre><code id="ptaxd0"></code></pre></p></div>
+                <div class="live"><p class="caption">Brokers balance:</p><p class="content"><pre><code id="brokersbal"></code></pre></p></div>
+                <div class="live"><p class="caption">Synthetic BRLUSD quotes:</p><p class="content"><pre><code id="assetsquotes"></code></pre></p></div>
+                <div class="live"><p class="caption">DI1 FY+1/FY+2 quotes:</p><p class="content"><pre><code id="di1quotes"></code></pre></p></div>
+                <div class="live"><p class="caption">Assets books:</p><p class="content"><pre><code id="assetsbooks"></code></pre></p></div>
+                <div class="live"><p class="caption">Spot hired:</p><p class="content"><pre><code id="spothired"></code></pre></p></div>
+
+                <div class="static"><p class="caption">VPOC analisys:</p><p class="content"><pre><code id="vpoc"></code></pre></p></div>
+                <div class="static"><p class="caption">PTAX D-1 analisys:</p><p class="content"><pre><code id="ptaxd1"></code></pre></p></div>
+                <div class="static"><p class="caption">Spot for settle date:</p><p class="content"><pre><code id="spotsettle"></code></pre></p></div>
+                <div class="static"><p class="caption">OI Players Balance:</p><p class="content"><pre><code id="playersbal"></code></pre></p></div>
+                <div class="static"><p class="caption">VWAP Open Interest:</p><p class="content"><pre><code id="oivwap"></code></pre></p></div>
+                <div class="static"><p class="caption">VWAP Options:</p><p class="content"><pre><code id="optionsvwap"></code></pre></p></div>
+                <div class="static"><p class="caption">Volatility:</p><p class="content"><pre><code id="volatility"></code></pre></p></div>
+                <div class="clogs"><p class="caption">Log messages:</p><p class="content"><pre><code id="logs"></code></pre></p></div>
+                <br/>
+            </div>
+        </div>
+    </body>
+</html>

@@ -4,7 +4,7 @@
 import { DateTime } from 'luxon';
 import Query from './query';
 import { IAssetWeight } from './queryPlayers';
-import TelegramBot, { TUserType } from '../../bot/telegramBot';
+import BaseBot, { TUserType } from '../../bot/baseBot';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
 import { TCountryCode } from '../tcountry';
 
@@ -63,9 +63,7 @@ class QueryOI extends Query {
 
     let botResponse: any;
     if (resOI)
-      botResponse = TelegramBot.printJSON(
-        resOI.OIDates[resOI.OIDates.length - 1],
-      );
+      botResponse = BaseBot.printJSON(resOI.OIDates[resOI.OIDates.length - 1]);
     else botResponse = 'Not enought data.';
 
     const msgHeader = `OI - Date From: ${
@@ -78,36 +76,29 @@ class QueryOI extends Query {
       this.bot.sendMessageToUsers(
         TUserType.DEFAULT,
         botResponse,
-        {},
+        undefined,
         false,
         msgHeader,
       );
     } else {
-      this.bot.sendMessage(
-        params.chatId,
-        `${msgHeader}${botResponse}`,
-        params.messageId
-          ? { reply_to_message_id: params.messageId }
-          : undefined,
-      );
+      this.bot.sendMessage(`${msgHeader}${botResponse}`, {
+        chatId: params.chatId,
+        replyToMessageId: params.messageId ? params.messageId : undefined,
+      });
 
       if (resOI) {
         const filename = `OI_${params.assets.map(a => a.asset).join('_')}_${
           params.contract
         }_${DateTime.now().toFormat('yyyyMMddHHmmss')}.txt`;
-        const stream = Buffer.from(TelegramBot.printJSON(resOI), 'utf-8');
-        await this.bot.sendDocument(
-          params.chatId,
-          stream,
-          {
+        const stream = Buffer.from(BaseBot.printJSON(resOI), 'utf-8');
+        await this.bot.sendDocument(stream, {
+          chatId: params.chatId,
+          replyToMessageId: params.messageId,
+          extraOptions: {
             caption: msgHeader,
-            reply_to_message_id: params.messageId,
-          },
-          {
             filename,
-            contentType: 'text/plain',
           },
-        );
+        });
       }
     }
     return !!resOI;
@@ -126,7 +117,7 @@ class QueryOI extends Query {
     const qOIFirstDate = await this.queryFactory.runQuery(
       `SELECT MIN(date)::DATE AS firstdate, MAX(date)::DATE AS lastdate 
           FROM "b3-summary" 
-          WHERE asset = ANY($1) AND contract=$2 AND 
+          WHERE "asset-code" = ANY($1) AND contract=$2 AND "asset-type"='FUTURES' AND
           COALESCE("oi-close", 0) - COALESCE("oi-open", 0) <> 0`,
       {
         assets: assets.map(a => a.asset),
@@ -135,7 +126,11 @@ class QueryOI extends Query {
     );
 
     if (!qOIFirstDate || qOIFirstDate.length === 0)
-      return { resOI: undefined, firstDate: dateFrom, lastDate: dateTo };
+      return {
+        resOI: undefined,
+        firstDate: dateFrom,
+        lastDate: dateTo,
+      };
     let firstDate: DateTime;
     if (dateFrom)
       firstDate =
@@ -143,7 +138,7 @@ class QueryOI extends Query {
         DateTime.fromJSDate(qOIFirstDate[0].firstdate).startOf('day').toMillis()
           ? DateTime.fromJSDate(qOIFirstDate[0].firstdate)
           : dateFrom;
-    else firstDate = qOIFirstDate[0].firstdate;
+    else firstDate = DateTime.fromJSDate(qOIFirstDate[0].firstdate);
 
     let lastDate: DateTime;
     if (dateTo)
@@ -153,7 +148,7 @@ class QueryOI extends Query {
           .toMillis() < dateTo.startOf('day').toMillis()
           ? DateTime.fromJSDate(qOIFirstDate[0].lastdate)
           : dateTo;
-    else lastDate = qOIFirstDate[0].lastdate;
+    else lastDate = DateTime.fromJSDate(qOIFirstDate[0].lastdate);
 
     const resOI: IOIDateRange | undefined = await this.getOIDateRange(
       contract,
@@ -162,7 +157,11 @@ class QueryOI extends Query {
       lastDate,
     );
 
-    return { resOI, firstDate, lastDate };
+    return {
+      resOI,
+      firstDate,
+      lastDate,
+    };
   }
 
   private async getUpdatedOIPoint(
@@ -211,8 +210,19 @@ class QueryOI extends Query {
     dateFrom: DateTime,
     dateTo: DateTime,
   ): Promise<IOIDateRange | undefined> {
+    if (
+      !dateFrom ||
+      !dateTo ||
+      !dateFrom.isValid ||
+      !dateTo.isValid ||
+      assets.length === 0 ||
+      contract === ''
+    )
+      return undefined;
+
     const oiDates: IOIDate[] = [];
     let date = dateFrom;
+
     while (date.startOf('day').toMillis() <= dateTo.startOf('day').toMillis()) {
       const oiDate: IOIDate | undefined = await this.getOIDate(
         contract,
@@ -244,25 +254,15 @@ class QueryOI extends Query {
     assets: IAssetWeight[],
     dateRef: DateTime,
   ): Promise<IOIDate | undefined> {
-    /* if (isSameDay(dateRef, new Date(2021, 8, 16))) {
-      console.log('passou');
-    } */
     const oiPoints: IOIPoint[] = await this.getPoints(
       contract,
       assets,
       dateRef,
     );
 
-    /* const vwapDate: IOIPoint = oiPoints.find(
+    const vwapDate: IOIPoint = oiPoints.find(
       p => p.type === TOIPoint.VWAPDATE,
-    )!; */
-    let vwapDate: IOIPoint;
-    try {
-      vwapDate = oiPoints.find(p => p.type === TOIPoint.VWAPDATE)!;
-    } catch (e) {
-      console.log(dateRef);
-      throw e;
-    }
+    )!;
 
     const oiDate = vwapDate.volume;
     const adjOiDateVolume =
@@ -338,12 +338,13 @@ class QueryOI extends Query {
     ) {
       const aSQL: string[] = [];
       assets.forEach(a => {
+        // TO DO: Implementar consulta para leitura de produtos de rolagem em b3-assetsquotes,
+        // calculando o preço de rolagem
         aSQL.push(
-          `select 
-          SUM(price*quantity*${a.weight})/SUM(quantity*${a.weight}) as level, 
-          SUM(quantity*${a.weight}) as volume 
-          from "intraday-trades" where 
-          asset='${a.asset}${contract}' and "ts-trade"::DATE=$1::DATE`,
+          `SELECT vwap as level, sum(volume*${a.weight}) as volume 
+          FROM "b3-assetsquotes" WHERE
+          asset='${a.asset}${contract}' AND "datetime"::DATE=$1::DATE 
+          ORDER BY "datetime" DESC LIMIT 1`,
         );
       });
       const sql = `select coalesce(sum(level*volume)/sum(volume), 0) as vwap, 
@@ -358,7 +359,7 @@ class QueryOI extends Query {
         aSQL.push(
           `select level as level, size*${a.weight} as volume 
           from "b3-rollingtrades" 
-          where asset = '${a.asset}' and 
+          where "asset-code" = '${a.asset}' and 
           "trade-timestamp"::DATE = $1 and "contract-to" = $2`,
         );
       });
@@ -430,10 +431,16 @@ class QueryOI extends Query {
   }
 
   private async getFRP1Point(dateRef: DateTime): Promise<IOIPoint | undefined> {
-    const sql = `SELECT p.ptax + f.frp1 AS frp1price, f.volume FROM 
+    /* const sql = `SELECT p.ptax + f.frp1 AS frp1price, f.volume FROM 
         (SELECT (MAX(high) + MIN(low))/2 AS frp1, SUM(volume) AS volume 
         FROM "b3-ts-summary" 
         WHERE "timestamp-open"::DATE = $1::DATE AND asset = 'FRP1') f,
+        (SELECT "pbrl_ptax_sell" * 1000 AS ptax FROM "bcb-ptax" 
+        WHERE date::DATE = $2::DATE AND "currency-code" = 'USD') p`; */
+    const sql = `SELECT p.ptax + f.frp1 AS frp1price, f.volume FROM 
+        (SELECT (high + low)/2 AS frp1, "volume-size" AS volume 
+        FROM "b3-summary" 
+        WHERE date = $1::DATE AND asset = 'FRP1') f,
         (SELECT "pbrl_ptax_sell" * 1000 AS ptax FROM "bcb-ptax" 
         WHERE date::DATE = $2::DATE AND "currency-code" = 'USD') p`;
 
@@ -478,11 +485,10 @@ class QueryOI extends Query {
           process.env.BOT_QUERY_OI_HIGH_LOW_TO_SDEV_MULTIPLIER || '0.225',
         )} as sigma
         FROM "b3-summary" 
-        WHERE date::DATE=$1::DATE AND asset=$2 AND contract=$3`,
+        WHERE date::DATE=$1::DATE AND asset=$2`,
         {
           date: dateRef.toJSDate(),
-          asset: a.asset,
-          contract,
+          asset: `${a.asset}${contract}`,
         },
       );
 

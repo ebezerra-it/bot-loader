@@ -3,21 +3,17 @@
 import { DateTime } from 'luxon';
 import path from 'path';
 import Query from './query';
-import TelegramBot, { TUserType } from '../../bot/telegramBot';
+import BaseBot, { TUserType } from '../../bot/baseBot';
 import ReportLoaderCalendar from '../reportLoaderCalendar';
 import { TCountryCode } from '../tcountry';
 import { QueryFactory } from '../../db/queryFactory';
 import { loadJSONFile } from '../utils';
+import { IAssetWeight } from './queryPlayers';
 
 enum TBrokerType {
   NATIONAL = 'N',
   FOREIGN = 'F',
   OTHER = 'O',
-}
-
-interface IAsset {
-  name: string;
-  weight: number;
 }
 
 interface IBroker {
@@ -48,7 +44,7 @@ interface IBrokerTypesBalance {
 
 interface IBalanceVision {
   visionName: string;
-  assets: IAsset[];
+  assets: IAssetWeight[];
   datetime: DateTime;
   brokerTypesBalance?: IBrokerTypesBalance[] | undefined;
   brokersBalance?: IBrokerBalance[] | undefined;
@@ -58,7 +54,7 @@ const VISION_BROKERS_DB_TABLE = 'Brokers DB Table';
 
 export default class QueryBrokersBalance extends Query {
   public async process(params: {
-    assets: IAsset[];
+    assets: IAssetWeight[];
     dateFrom: DateTime;
     dateTo?: DateTime;
     visionName?: string;
@@ -73,13 +69,13 @@ export default class QueryBrokersBalance extends Query {
 
     if (params.dateTo) {
       msgHeader = `BROKERS BALANCE DIFFERENCE - Assets: ${params.assets.map(
-        a => a.name,
+        a => a.asset,
       )} - Date from: ${params.dateFrom.toFormat(
         'dd/MM/yyyy HH:mm',
       )} - Date to: ${params.dateTo.toFormat('dd/MM/yyyy HH:mm')}\n`;
     } else {
       msgHeader = `BROKERS BALANCE - Assets: ${params.assets.map(
-        a => a.name,
+        a => a.asset,
       )} - Date from: ${params.dateFrom.toFormat('dd/MM/yyyy HH:mm')}\n`;
     }
 
@@ -131,7 +127,7 @@ export default class QueryBrokersBalance extends Query {
       if (balanceVision) {
         delete balanceVision.brokersBalance;
 
-        botResponse = TelegramBot.printJSON(balanceVision);
+        botResponse = BaseBot.printJSON(balanceVision);
       } else botResponse = 'Not enought data.';
     }
 
@@ -139,40 +135,140 @@ export default class QueryBrokersBalance extends Query {
       this.bot.sendMessageToUsers(
         TUserType.DEFAULT,
         botResponse,
-        {},
+        undefined,
         false,
         msgHeader,
       );
     } else {
-      this.bot.sendMessage(
-        params.chatId,
-        `${msgHeader}${botResponse}`,
-        params.messageId
-          ? { reply_to_message_id: params.messageId }
-          : undefined,
-      );
+      this.bot.sendMessage(`${msgHeader}${botResponse}`, {
+        chatId: params.chatId,
+        replyToMessageId: params.messageId ? params.messageId : undefined,
+      });
     }
     return !!balanceVision;
+  }
+
+  public static async calculate(
+    queryFactory: QueryFactory,
+    assets: IAssetWeight[],
+    dateFrom: DateTime,
+    dateTo?: DateTime,
+    visionName?: string,
+    // rollAssetsCodes?: IAssetWeight[], // DR1, WD1, IR1, WR1, etc.
+  ): Promise<IBalanceVision | undefined> {
+    if (
+      !(await ReportLoaderCalendar.isTradeDay(
+        queryFactory,
+        dateFrom,
+        TCountryCode.BR,
+      )) ||
+      (dateTo &&
+        !(await ReportLoaderCalendar.isTradeDay(
+          queryFactory,
+          dateTo,
+          TCountryCode.BR,
+        )))
+    )
+      return undefined;
+
+    // let balanceVisionFrom: IBalanceVision | undefined;
+    let balanceVisionTo: IBalanceVision | undefined;
+    let balanceVision: IBalanceVision | undefined;
+
+    const brokersVision = await QueryBrokersBalance.getBrokersVision(
+      queryFactory,
+      visionName && visionName !== '' ? visionName : 'VISION-BMF',
+    );
+
+    if (!brokersVision) return undefined;
+
+    const balanceVisionFrom = await QueryBrokersBalance.getBalanceVision(
+      queryFactory,
+      brokersVision,
+      dateFrom,
+      assets,
+    );
+
+    if (!dateTo) {
+      balanceVision = balanceVisionFrom;
+    } else {
+      balanceVisionTo = await QueryBrokersBalance.getBalanceVision(
+        queryFactory,
+        brokersVision,
+        dateTo,
+        assets,
+      );
+
+      balanceVision = QueryBrokersBalance.calculateBrokersBalanceVisionDiff(
+        balanceVisionFrom,
+        balanceVisionTo,
+      );
+    }
+
+    if (balanceVision) delete balanceVision.brokersBalance;
+    else return undefined;
+    return balanceVision;
   }
 
   public static async getBalanceVision(
     queryFactory: QueryFactory,
     brokersVision: IBrokersVision,
     datetime: DateTime,
-    assets: IAsset[],
+    assets: IAssetWeight[],
   ): Promise<IBalanceVision | undefined> {
     const assetsBrokersBalance: IBrokerBalance[] = [];
+    /* const orderBy =
+      datetime.get('hour') >= 18 && datetime.get('minute') >= 30
+        ? 'DESC'
+        : 'ASC'; */
 
     for await (const asset of assets) {
+      /* const match = asset.asset.match(/[A-Za-z0-9]{3,}([FGHJKMNOUVXZ]\d\d)/);
+
+      if (match && match.length === 3) {
+        const assetCode = match[1];
+        const contract = match[2];
+
+        const qRollAssets = await queryFactory.runQuery(
+          `SELECT asset FROM "b3-assets-expiry" 
+        WHERE "product-group" = 'ROLLOVER' AND "underlying-asset" = $2 AND 
+        asset like '%$3%'
+        "date-trading-start"::DATE <= $1::DATE AND "date-expiry"::DATE > $1`,
+          {
+            dateRef: datetime.toJSDate(),
+            assetCode,
+            contract,
+          },
+        );
+
+        for await (const rollAsset of qRollAssets) {
+          const qBrokerBalRoll = await queryFactory.runQuery(
+            `SELECT * FROM 
+            (SELECT DISTINCT ON ("broker-id") "broker-id" brokerid, datetime, asset, volume, vwap 
+            FROM "b3-assetsbrokers" 
+            WHERE asset = ANY($1) AND datetime::TIMESTAMPTZ<=$2::TIMESTAMPTZ AND datetime::DATE=$2::DATE
+            ORDER BY "broker-id" ASC, datetime DESC) q 
+            ORDER BY volume DESC, vwap DESC`,
+            {
+              asset: '', // ([A-Za-z0-9]{3,})([FGHJKMNOUVXZ]\d\d)
+              datetime: datetime.toJSDate(),
+            },
+          );
+        }
+        if (qRollAssets && qRollAssets.length > 0) {
+          //
+        }
+      } */
+
       const qBrokersBalance = await queryFactory.runQuery(
         `SELECT * FROM 
         (SELECT DISTINCT ON ("broker-id") "broker-id" brokerid, datetime, asset, volume, vwap 
-        FROM "b3-brokersbalance" 
+        FROM "b3-assetsbrokers" 
         WHERE asset=$1 AND datetime::TIMESTAMPTZ<=$2::TIMESTAMPTZ AND datetime::DATE=$2::DATE
         ORDER BY "broker-id" ASC, datetime DESC) q 
         ORDER BY volume DESC, vwap DESC`,
         {
-          asset: asset.name,
+          asset: asset.asset,
           datetime: datetime.toJSDate(),
         },
       );
@@ -205,16 +301,22 @@ export default class QueryBrokersBalance extends Query {
         );
         if (!assetsBroker) return;
 
-        const sumVolume = assetsBroker
-          .map(b => b.volume)
-          .reduce((acum, curr) => {
-            return acum + curr;
-          });
-        const sumPriceVolume = assetsBroker
-          .map(b => b.volume * b.vwap)
-          .reduce((acum, curr) => {
-            return acum + curr;
-          });
+        const sumVolume =
+          assetsBroker.length > 0
+            ? assetsBroker
+                .map((b: IBrokerBalance) => b.volume)
+                .reduce((acum: number, curr: number) => {
+                  return acum + curr;
+                })
+            : 0;
+        const sumPriceVolume =
+          assetsBroker.length > 0
+            ? assetsBroker
+                .map((b: IBrokerBalance) => b.volume * b.vwap)
+                .reduce((acum: number, curr: number) => {
+                  return acum + curr;
+                })
+            : 0;
 
         const lastDatetime = Math.max.apply(
           null,
@@ -236,16 +338,22 @@ export default class QueryBrokersBalance extends Query {
         );
         if (!assetsBrokersType) return;
 
-        const sumVolume = assetsBrokersType
-          .map(b => b.volume)
-          .reduce((acum, curr) => {
-            return acum + curr;
-          });
-        const sumPriceVolume = assetsBrokersType
-          .map(b => b.volume * b.vwap)
-          .reduce((acum, curr) => {
-            return acum + curr;
-          });
+        const sumVolume =
+          assetsBrokersType.length > 0
+            ? assetsBrokersType
+                .map((b: IBrokerBalance) => b.volume)
+                .reduce((acum: number, curr: number) => {
+                  return acum + curr;
+                })
+            : 0;
+        const sumPriceVolume =
+          assetsBrokersType.length > 0
+            ? assetsBrokersType
+                .map((b: IBrokerBalance) => b.volume * b.vwap)
+                .reduce((acum: number, curr: number) => {
+                  return acum + curr;
+                })
+            : 0;
         const lastDatetime = Math.max.apply(
           null,
           assetsBrokersType.map(b => b.datetime.toMillis()),
@@ -442,4 +550,4 @@ export default class QueryBrokersBalance extends Query {
     };
   }
 }
-export { IAsset, IBroker, IBrokersVision, IBrokerBalance, IBrokerTypesBalance };
+export { IBroker, IBrokersVision, IBrokerBalance, IBrokerTypesBalance };

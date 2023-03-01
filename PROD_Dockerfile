@@ -1,4 +1,4 @@
-FROM node:14.17.3-buster-slim
+FROM node:18.11.0-buster-slim
 RUN  apt-get update \
      && apt-get install -y wget gnupg ca-certificates procps libxss1 \
      && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
@@ -6,7 +6,7 @@ RUN  apt-get update \
      && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
      && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt buster-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
      && apt-get update \
-     && apt-get install -y google-chrome-stable postgresql-client-14 pigz \
+     && apt-get install -y google-chrome-stable postgresql-client-14 pigz pnmtopng \
      && rm -rf /var/lib/apt/lists/*
 ARG NODE_ENV
 RUN yarn global add rimraf
@@ -16,7 +16,10 @@ RUN rm -rf ./config ./build package.json yarn.lock .env tsconfigParser.js ormcon
 COPY package.json yarn.lock ./
 RUN yarn prod:install
 COPY tsconfigParser.js ormconfig.js tsconfig.json ./
-COPY cert/ssl/client.key ./cert/ssl/client.key
-COPY cert/ssl/client.crt ./cert/ssl/client.crt
+COPY cert/db/client.key ./cert/db/client.key
+COPY cert/db/client.crt ./cert/db/client.crt
+COPY cert/db/root.crt ./cert/db/root.crt
+COPY cert/web/key.pem ./cert/web/key.pem
+COPY cert/web/cert.pem ./cert/web/cert.pem
 COPY build ./build
 COPY config ./config

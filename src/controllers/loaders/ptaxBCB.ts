@@ -202,11 +202,14 @@ class PtaxBCB extends ReportLoaderCalendar {
 
           if (
             dateTime.startOf('day').toMillis() ===
-              now.startOf('day').toMillis() &&
+            now.startOf('day').toMillis() /* &&
             now.hour === dateTime.hour &&
-            now.minute - dateTime.minute <= 10
+            Math.abs(now.minute - dateTime.minute) < 3 */
           ) {
             dateTime = now;
+          } else {
+            // Sets partial minute to 10 instead of 0 (BCB site)
+            dateTime = dateTime.set({ minute: 10, second: 0, millisecond: 0 });
           }
 
           if (tds[1].rawText.trim().toUpperCase().includes('FECH. PTAX')) {
@@ -491,13 +494,18 @@ class PtaxBCB extends ReportLoaderCalendar {
     });
     inserted++;
 
-    if (
+    /* if (
       asset.currencyCode === TCurrencyCode.USD &&
       res.date.startOf('day').toMillis() ===
         DateTime.now().startOf('day').toMillis()
     ) {
-      this.throwBotEvent('DOL_PTAX', { d: dateRef.toJSDate(), q: 2 });
-    }
+      this.throwBotEvent('PTAX-USD', { d: dateRef.toJSDate(), q: 2 });
+      this.throwBotEvent('PTAX-USD-D0', {
+        d: dateRef.toJSDate(),
+        pq: 5,
+        pm: 1.0,
+      });
+    } */
 
     if (
       lastTaskOfDay &&

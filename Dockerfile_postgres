@@ -5,13 +5,13 @@ COPY cert/pg_hba.conf /var/lib/postgresql/pg_hba.conf
 RUN sed -i "s/<DB_NAME>/$DB_NAME/g" /var/lib/postgresql/pg_hba.conf
 
 # On Windows root will own the files, and they will have permissions 755
-COPY cert/ssl/client.key /var/lib/postgresql/server.key
-COPY cert/ssl/client.crt /var/lib/postgresql/server.crt
+COPY cert/db/server.key /var/lib/postgresql/server.key
+COPY cert/db/server.crt /var/lib/postgresql/server.crt
 
 # update the privileges on the .key, no need to touch the .crt  
 RUN chmod 600 /var/lib/postgresql/server.crt /var/lib/postgresql/server.key
 RUN chown postgres:postgres /var/lib/postgresql/server.key /var/lib/postgresql/server.crt
 
 # CA certificate
-COPY cert/ssl/ca.crt /var/lib/postgresql/ca.crt
-RUN chown postgres:postgres /var/lib/postgresql/ca.crt
+COPY cert/db/root.crt /var/lib/postgresql/root.crt
+RUN chown postgres:postgres /var/lib/postgresql/root.crt

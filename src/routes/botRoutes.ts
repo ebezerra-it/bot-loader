@@ -2,10 +2,7 @@
 import { Router } from 'express';
 import { DateTime } from 'luxon';
 import { isNumber } from '../controllers/utils';
-import TelegramBot, {
-  TUserType,
-  TUserReturnAuthType,
-} from '../bot/telegramBot';
+import BaseBot, { TUserType, TUserReturnAuthType } from '../bot/baseBot';
 import QueryPTAX from '../controllers/queries/queryPTAX';
 import QuerySPOT from '../controllers/queries/querySPOT';
 import BaseRoutes from './baseRoutes';
@@ -21,9 +18,9 @@ export default class BotRoutes extends BaseRoutes {
         this.bot.sendMessageToUsers(
           TUserType.ADMINISTRATOR,
           m,
-          {},
+          undefined,
           true,
-          process.env.TELEGRAM_TRACELOG_MESSAGE_CAPTION || '',
+          process.env.BOT_TRACELOG_MESSAGE_CAPTION || '',
         );
       } catch (error) {
         this.logger.error(
@@ -40,9 +37,9 @@ export default class BotRoutes extends BaseRoutes {
         if ((t === undefined && u === undefined) || m === undefined)
           throw new Error(`Missing parameters: t=${t}, u=${u}, m=${m}`);
         if (u !== undefined) {
-          const { authType, user } = await this.bot.getUser({ id: u });
+          const { authType, user } = await this.bot.getBotUser({ id: u });
           if (authType !== TUserReturnAuthType.AUTH || !user) return;
-          this.bot.sendMessage(user.chatId, m);
+          this.bot.sendMessage(m, { chatId: user.chatId });
         } else {
           this.bot.sendMessageToUsers(t, m);
         }
@@ -73,6 +70,14 @@ export default class BotRoutes extends BaseRoutes {
               priorDays: p.q && isNumber(p.q) ? Number(p.q) : 2,
             });
             break;
+          case 'PTAX-USD-D0':
+            await new QueryPTAX(this.bot).processPTAXD0({
+              dateRef,
+              projectionsQtty: p.pq && isNumber(p.pq) ? Number(p.pq) : 5,
+              projectionsMultiplier:
+                p.pm && isNumber(p.pm) ? Number(p.pm) : 1.0,
+            });
+            break;
           case 'SPOT-USD':
             await new QuerySPOT(this.bot).process(
               {
@@ -81,7 +86,7 @@ export default class BotRoutes extends BaseRoutes {
                 spotProjectionsQtty: 6,
                 spotProjectionsMultiplier: 1,
               },
-              true,
+              true, // today
             );
             break;
           case 'ECONOMIC-CALENDAR':
@@ -94,8 +99,7 @@ export default class BotRoutes extends BaseRoutes {
 
             this.bot.sendMessageToUsers(
               TUserType.DEFAULT,
-              `ECONOMIC CALENDAR EVENT:\n${TelegramBot.printJSON(resEvent)}`,
-              {},
+              `ECONOMIC CALENDAR EVENT:\n${BaseBot.printJSON(resEvent)}`,
             );
             break;
         }

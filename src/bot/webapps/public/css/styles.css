@@ -1,0 +1,78 @@
+#main{
+    background-color: white;
+    width: 600px;
+    margin: auto;
+    outline: dashed 1px gray;
+}
+
+.controls{
+    width: 550px;
+    font-size: small;
+    margin: 25px
+}
+
+.imguserphoto{
+    border: 2px solid #0088cc;
+    width: 80px;
+    border-radius: 50%;
+}
+
+.cerror{
+    background-color: rgb(252, 218, 223);
+    width: 550px;
+    font-size: small;
+    padding: 0px;
+    margin-left: 25px;
+    margin-right: 25px;
+    margin-bottom: 10px;
+}
+
+.live{
+    background-color: rgb(204, 245, 199);;
+    width: 550px;
+    font-size: small;
+    padding: 0px;
+    margin-left: 25px;
+    margin-right: 25px;
+    margin-bottom: 10px;
+}
+
+.static{
+    background-color: lightgray;
+    width: 550px;
+    font-size: small;
+    padding: 0px;
+    margin-left: 25px;
+    margin-right: 25px;
+    margin-bottom: 10px;
+}
+
+.clogs{
+    background-color: lightyellow;
+    width: 550px;
+    font-size: small;
+    padding: 0px;
+    margin-left: 25px;
+    margin-right: 25px;
+    margin-bottom: 10px;
+}
+
+.caption{
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-weight: bold;
+    margin: auto;
+}
+
+.content{
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-weight: normal;
+    margin: auto;
+}
+
+h1{
+    font-family: Georgia, 'Times New Roman', Times, serif;
+}
+
+body{
+    background-color: lightcyan;
+}

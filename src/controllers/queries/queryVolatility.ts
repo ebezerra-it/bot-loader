@@ -1,9 +1,10 @@
 /* eslint-disable camelcase */
 import { DateTime, Duration } from 'luxon';
 import Query from './query';
-import TelegramBot, { TUserType } from '../../bot/telegramBot';
+import BaseBot, { TUserType } from '../../bot/baseBot';
 import { IAssetWeight } from './queryPlayers';
-import { QueryOptions, IContract, TContract } from './queryOptions';
+import { QueryOptions, IContract } from './queryOptions';
+import { TContractType } from './queryFRP0';
 
 enum TAssetType {
   FUTURE = 'FUTURE',
@@ -36,48 +37,43 @@ export default class QueryVolatility extends Query {
     chatId?: number;
     messageId?: number;
   }): Promise<boolean> {
+    const dateTo = params.dateRef;
+    const dateFrom = dateTo.minus(params.sampleSize);
     const msgHeader = `VOLATILITY Assets: ${params.assets
       .map(a => a.asset)
-      .join(', ')}  - Date: ${params.dateRef.toFormat('dd/MM/yyyy')}\n`;
-
-    const dateTo = params.dateRef.plus(params.sampleSize);
+      .join(', ')}  - DateFrom: ${dateFrom.toFormat(
+      'dd/MM/yyyy',
+    )}  - DateTo: ${dateTo.toFormat('dd/MM/yyyy')}\n`;
 
     let resAssetsVol: IAssetVolatility | undefined;
 
     if (params.assetType === TAssetType.FUTURE) {
-      resAssetsVol = await this.getVolatility(
-        params.assets,
-        params.dateRef,
-        dateTo,
-      );
+      resAssetsVol = await this.getVolatility(params.assets, dateFrom, dateTo);
     }
 
-    if (!resAssetsVol) {
-      return false;
-    }
+    let botResponse;
+    if (resAssetsVol) botResponse = BaseBot.printJSON(resAssetsVol);
+    else botResponse = 'Not enought data.';
 
     if (!params.chatId) {
       this.bot.sendMessageToUsers(
         TUserType.DEFAULT,
-        TelegramBot.printJSON(resAssetsVol),
-        {},
+        `${msgHeader}${botResponse}`,
+        undefined,
         false,
         msgHeader,
       );
     } else {
-      this.bot.sendMessage(
-        params.chatId,
-        `${msgHeader}${TelegramBot.printJSON(resAssetsVol)}`,
-        params.messageId
-          ? { reply_to_message_id: params.messageId }
-          : undefined,
-      );
+      this.bot.sendMessage(`${msgHeader}${botResponse}`, {
+        chatId: params.chatId,
+        replyToMessageId: params.messageId ? params.messageId : undefined,
+      });
     }
 
     return !!resAssetsVol;
   }
 
-  private async getVolatility(
+  public async getVolatility(
     assets: IAssetWeight[],
     dateFrom: DateTime,
     dateTo: DateTime,
@@ -111,18 +107,22 @@ export default class QueryVolatility extends Query {
     let contract: IContract = await QueryOptions.getContractCode(
       this.queryFactory,
       dateFrom,
-      TContract.CURRENT,
+      TContractType.CURRENT,
+    );
+    if (contract) contracts.push(contract);
+    contract = await QueryOptions.getContractCode(
+      this.queryFactory,
+      contract.lastTradeDate.plus({ months: 1 }),
+      TContractType.CURRENT,
     );
 
-    contracts.push(contract);
-
     while (contract.lastTradeDate.toMillis() < dateTo.toMillis()) {
+      contracts.push(contract);
       contract = await QueryOptions.getContractCode(
         this.queryFactory,
-        contract.dateBeginVigency.plus({ months: 1 }),
-        TContract.CURRENT,
+        contract.lastTradeDate.plus({ months: 1 }),
+        TContractType.CURRENT,
       );
-      contracts.push(contract);
     }
 
     const sqlContracts: string[] = [];
@@ -138,9 +138,11 @@ export default class QueryVolatility extends Query {
         MAX(high) - MIN(low) var 
         
         FROM "b3-ts-summary" 
-        WHERE asset = ANY('{${assets.map(a => `${a}${c.code}`).join(',')}}') 
-        AND "timestamp-open"::DATE >= ${c.dateBeginVigency.toSQL} AND 
-        "timestamp-open"::DATE <= ${c.lastTradeDate.toSQL} 
+        WHERE asset = ANY('{${assets
+          .map(a => `${a.asset}${c.code}`)
+          .join(',')}}') 
+        AND "timestamp-open"::DATE >= '${c.dateBeginVigency.toSQL()}' AND 
+        "timestamp-open"::DATE <= '${c.lastTradeDate.toSQL()}' 
         GROUP BY "timestamp-open"::DATE ORDER BY "timestamp-open"::DATE`,
       ),
     );
@@ -150,7 +152,7 @@ export default class QueryVolatility extends Query {
     STDDEV_SAMP(var) sd, 
     percentile_disc(0.5) within group (order by var) median 
 
-    FROM (${contracts.join(' UNION ')}) q`;
+    FROM (${sqlContracts.join(' UNION ')}) q`;
 
     const qAssetVol = await this.queryFactory.runQuery(sql, {});
     if (!qAssetVol || qAssetVol.length === 0) return undefined;

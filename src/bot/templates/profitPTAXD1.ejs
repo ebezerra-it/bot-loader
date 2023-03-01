@@ -3,9 +3,9 @@
     Author: t.me/edubbulhoes
 }
 input
-    ShowProjections(6);
+    ShowProjections(10);
     ProjectionMultiplier(1.0);
-    ShowRelevantProjectionsOnly(False);
+    ShowRelevantProjectionsOnly(true);
     ShowBand1(true);
 var 
     dt: Array[0..<%= qte %>] of Integer;
@@ -54,7 +54,7 @@ begin
                         k := 2;
                         for j := 1 to qttyProj do
                         begin
-                            if ((ShowRelevantProjectionsOnly) And ((fHigh[i] = 0) Or ((fRefValue + projMulti*j*fRefBand) <= fHigh[i]))) then
+                        if ((fHigh[i] = 0) Or ((Not ShowRelevantProjectionsOnly) Or ((fRefValue + projMulti*j*fRefBand) <= fHigh[i]+fRefBand/2))) then
                             begin
                                 setPlotColor(k, RGB(153,255,153));
                                 plotN(k, fRefValue + projMulti*j*fRefBand);
@@ -63,7 +63,7 @@ begin
                         end;
                         for j := 1 to qttyProj do
                         begin
-                            if ((ShowRelevantProjectionsOnly) And ((fLow[i] = 0) Or ((fRefValue - projMulti*j*fRefBand) >= fLow[i]))) then
+                        if ((fLow[i] = 0) Or ((Not ShowRelevantProjectionsOnly) Or ((fRefValue - projMulti*j*fRefBand) >= fLow[i]-fRefBand/2))) then
                             begin
                                 setPlotColor(k, RGB(255,153,153));
                                 plotN(k, fRefValue - ProjMulti*j*fRefBand);

@@ -5,5 +5,13 @@ temp/
 data/
 profit/
 cert/ssl/
-*.log
+cert/secure/
+log/
 pipe2host/
+*.log
+*.exe
+*.pem
+*.key
+*.crt
+*.p12
+*.lock

@@ -388,5 +388,80 @@
       "code": "SOY",
       "type": "FUTURES",
       "caption": "CONTRATO FUTURO DE SOJA BRASIL"
+    },
+    {
+      "code": "CSNAO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE CSNA3"
+    },
+    {
+      "code": "JBSSO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE JBSS3"
+    },
+    {
+      "code": "ITUBP",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE ITUB4"
+    },
+    {
+      "code": "RENTO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE RENT3"
+    },
+    {
+      "code": "NTCOO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE NTCO3"
+    },
+    {
+      "code": "ELETO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE ELET3"
+    },
+    {
+      "code": "SUZBO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE SUZB3"
+    },
+    {
+      "code": "BBDCP",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE BBDC4"
+    },
+    {
+      "code": "ABEVO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE ABEV3"
+    },
+    {
+      "code": "GGBRP",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE GGBR4"
+    },
+    {
+      "code": "ITSAP",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE ITSA4"
+    },
+    {
+      "code": "WEGEO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE WEGE3"
+    },
+    {
+      "code": "B3SAO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE B3SA3"
+    },
+    {
+      "code": "LRENO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE LREN3"
+    },
+    {
+      "code": "MGLUO",
+      "type": "FUTURES",
+      "caption": "CONTRATO FUTURO DE MGLU3"
     }
   ]

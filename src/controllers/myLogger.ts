@@ -1,7 +1,7 @@
 import { Logger, ILogObject, TLogLevelName, TLogLevelId } from 'tslog';
-import { appendFileSync } from 'fs';
+import fs, { appendFileSync } from 'fs';
 import axios, { AxiosInstance } from 'axios';
-import qs from 'qs';
+import https from 'https';
 import path from 'path';
 import { DateTime } from 'luxon';
 
@@ -40,16 +40,27 @@ class MyLogger extends Logger {
       'silly',
     );
     this.apiBot = axios.create();
+    this.apiBot.defaults.httpsAgent = new https.Agent({
+      requestCert: true,
+      ca: fs.readFileSync(path.join(__dirname, '../../cert/web/cert.pem')),
+      rejectUnauthorized: true,
+      keepAlive: false,
+    });
+    this.apiBot.defaults.headers = {
+      'Content-Type': 'application/json',
+      crossDomain: false,
+    };
   }
 
   public async botlogEvent(logObject: ILogObject): Promise<undefined | string> {
     try {
       const res = await this.apiBot.post(
-        `http://localhost:${process.env.TELEGRAM_API_PORT || '8001'}/tracelog`,
-        qs.stringify({
-          m: JSON.stringify(logObject.argumentsArray.join('\n')),
-        }),
+        `https://localhost:${process.env.TELEGRAM_API_PORT || '443'}/tracelog`,
+        {
+          m: logObject.argumentsArray.join('\n'),
+        },
       );
+
       if (res.status !== 200) {
         const msg = `[BOT-LOGEVENT] Can't log event due to return status code: ${res.status} - ${res.statusText}`;
         // eslint-disable-next-line no-console
@@ -103,9 +114,7 @@ class MyLogger extends Logger {
     try {
       idMinLevelBotLog = <TLogLevelId>(
         tsLogLevels.indexOf(
-          <TLogLevelName>(
-            (process.env.TELEGRAM_TRACELOG_MIN_LOG_LEVEL || 'error')
-          ),
+          <TLogLevelName>(process.env.BOT_TRACELOG_MIN_LOG_LEVEL || 'error'),
         )
       );
 
@@ -118,14 +127,14 @@ class MyLogger extends Logger {
           tsLogLevels.indexOf(<TLogLevelName>'info')
         );
     } catch (err) {
-      const msg = `[BOT-LOGEVENT] Parameter TELEGRAM_TRACELOG_MIN_LOG_LEVEL with invalid content was adjusted to 'error': ${err.message}`;
+      const msg = `[BOT-LOGEVENT] Parameter BOT_TRACELOG_MIN_LOG_LEVEL with invalid content was adjusted to 'error': ${err.message}`;
       logObject.argumentsArray.push(msg);
       this.logToFile(logObject);
       this.botlogEvent(logObject);
       idMinLevelBotLog = <TLogLevelId>(
         tsLogLevels.indexOf(<TLogLevelName>'error')
       );
-      process.env.TELEGRAM_TRACELOG_MIN_LOG_LEVEL = 'error';
+      process.env.BOT_TRACELOG_MIN_LOG_LEVEL = 'error';
     }
 
     if (logObject.logLevelId >= idMinLevelBotLog) {
