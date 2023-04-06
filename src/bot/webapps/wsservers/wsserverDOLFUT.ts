@@ -19,9 +19,7 @@ import QueryOI from '../../../controllers/queries/queryOI';
 import QueryPlayers, {
   IAssetWeight,
 } from '../../../controllers/queries/queryPlayers';
-import QueryOptions, {
-  TFRPCalculationType,
-} from '../../../controllers/queries/queryOptions';
+import QueryOptions from '../../../controllers/queries/queryOptions';
 import QueryVolatility from '../../../controllers/queries/queryVolatility';
 import QueryFRP0, {
   TContractType,
@@ -275,15 +273,10 @@ export default class wsServerDOLFUT extends WSServerBase {
                 spothired: {
                   ...spothired,
                   future: {
-                    frp0: spothired.frp0.today
-                      ? +Number(spothired.vwap + spothired.frp0.today).toFixed(
-                          2,
-                        )
-                      : undefined,
-                    frp1d1: spothired.frp0.frp1d1
-                      ? +Number(spothired.vwap + spothired.frp0.frp1d1).toFixed(
-                          2,
-                        )
+                    frp0: spothired.frp0.traded
+                      ? +Number(
+                          spothired.vwap + spothired.frp0.traded.vwap,
+                        ).toFixed(2)
                       : undefined,
                     calculated: spothired.frp0.calculated
                       ? +Number(
@@ -527,7 +520,7 @@ export default class wsServerDOLFUT extends WSServerBase {
     // SPOT SETTLE
     new Promise<void>(resolve => {
       new QuerySPOT(this.bot)
-        .calculateSpotForSettleDate(dateRef, false)
+        .calculateSpotForSettleDate(dateRef)
         .then(spotsettle => {
           if (spotsettle) this.sendDataMessage({ spotsettle }, ws);
           resolve();
@@ -577,7 +570,7 @@ export default class wsServerDOLFUT extends WSServerBase {
     // OPTIONS VWAP
     new Promise<void>(resolve => {
       new QueryOptions(this.bot)
-        .calculateOIOptionsVWAP(dateRef, TFRPCalculationType.CLOSE_D1)
+        .calculateOIOptionsVWAP(dateRef)
         .then(options => {
           if (options) this.sendDataMessage({ optionsvwap: options }, ws);
           resolve();
@@ -596,8 +589,110 @@ export default class wsServerDOLFUT extends WSServerBase {
       );
     });
 
+    // NEXT CONTRACT ANALISYS
+    new Promise<void>(async (resolve: any) => {
+      const prevDate = await ReportLoaderCalendar.subTradeDays(
+        this.bot.queryFactory,
+        dateRef,
+        1,
+        TCountryCode.BR,
+      );
+
+      const nextContract = await QueryFRP0.getContractCode(
+        this.bot.queryFactory,
+        dateRef,
+        TContractType.NEXT,
+      );
+      const qFRP0 = await QueryFRP0.getFRP(
+        this.bot.queryFactory,
+        dateRef.endOf('day'),
+        true,
+        TContractType.CURRENT,
+      );
+
+      const frp0 = qFRP0
+        ? qFRP0.traded
+          ? qFRP0.traded.vwap
+          : qFRP0.calculated
+          ? qFRP0.calculated
+          : undefined
+        : undefined;
+
+      if (!frp0) throw new Error(`Missing FRP`);
+
+      let qNextVAP = await this.bot.queryFactory.runQuery(
+        `select sum(level*volume)/sum(volume) vwap, sum(volume) volume, max(level) high, min(level) low  from (
+        select coalesce(q1.level, q2.level) level, coalesce(q1.volume, 0) + coalesce(q2.volume, 0) volume  from
+        (select t.level, sum(t.volume*0.2) as volume from 
+                (select (jsonb_array_elements("volume-profile"::JSONB)->>'level')::numeric as level, (jsonb_array_elements("volume-profile"::JSONB)->>'volume')::numeric as volume, (jsonb_array_elements("volume-profile"::JSONB)->>'quantity')::numeric as quantity from "b3-ts-summary" where asset = $1 and "timestamp-open"::DATE=$3) t
+                group by t.level) q1
+        full outer join 
+        (select t.level, sum(t.volume) as volume from 
+                (select (jsonb_array_elements("volume-profile"::JSONB)->>'level')::numeric as level, (jsonb_array_elements("volume-profile"::JSONB)->>'volume')::numeric as volume, (jsonb_array_elements("volume-profile"::JSONB)->>'quantity')::numeric as quantity from "b3-ts-summary" where asset = $2 and "timestamp-open"::DATE=$3) t
+                group by t.level) q2
+        on (q1.level = q2.level)
+        order by level desc
+        ) qq`,
+        {
+          wdo: `WDO${nextContract.code}`,
+          dol: `DOL${nextContract.code}`,
+          prevDate: prevDate.toJSDate(),
+        },
+      );
+
+      if (!qNextVAP || qNextVAP.length === 0) {
+        qNextVAP = await this.bot.queryFactory.runQuery(
+          `select sum(vwap*volume)/sum(vol) vwap, sum(volume) volume, max(high) high, min(low) low from ( 
+          select vwap, "volume-size"*0.2 volume, high, low, (high+low)/2 pmo from "b3-summary" where asset = $1 and "date" = $3
+          union all
+          select vwap, "volume-size" volume, high, low, (high+low)/2 pmo from "b3-summary" where asset = $2 and "date" = $3
+          ) q`,
+          {
+            wdo: `WDO${nextContract.code}`,
+            dol: `DOL${nextContract.code}`,
+            prevDate: prevDate.toJSDate(),
+          },
+        );
+      }
+
+      if (qNextVAP && qNextVAP.length > 0) {
+        this.sendDataMessage(
+          {
+            nextcontract: {
+              dateRef: dateRef.startOf('day'),
+              prevDate: prevDate.startOf('day'),
+              nextContract: nextContract.code,
+              high: +Number(qNextVAP[0].high).toFixed(2) - frp0,
+              vwap: +Number(qNextVAP[0].vwap).toFixed(2) - frp0,
+              pmo: +(
+                (Number(qNextVAP[0].high) + Number(qNextVAP[0].low)) / 2 -
+                frp0
+              ).toFixed(2),
+              low: +Number(qNextVAP[0].low).toFixed(2) - frp0,
+              volume: +Number(qNextVAP[0].volume).toFixed(2),
+              frp0: qFRP0,
+            },
+          },
+          ws,
+        );
+        resolve();
+      }
+    }).catch(err => {
+      this.logger.error(`Query [NEXTCONTRACT] threw exception: ${err.message}`);
+      this.sendMessage(
+        {
+          timestamp: new Date(),
+          type: TMessageType.ERROR,
+          data: {
+            errorMessage: `Query [NEXTCONTRACT] threw exception: ${err.message}`,
+          },
+        },
+        ws,
+      );
+    });
+
     // VPOC
-    await new Promise<void>(async (resolve: any) => {
+    new Promise<void>(async (resolve: any) => {
       const vpocDaysSampleSize =
         params && Number(params.vpocdayssamplesize) > 0
           ? Number(params.vpocdayssamplesize) <
@@ -642,7 +737,7 @@ export default class wsServerDOLFUT extends WSServerBase {
 
       new QueryDolVpoc(this.bot)
         .calculate(
-          dateRef,
+          dateRef.startOf('day'),
           vpocDaysSampleSize,
           vpocSampleSize,
           vpocClusterTicksSize,

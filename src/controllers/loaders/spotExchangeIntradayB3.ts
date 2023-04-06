@@ -524,11 +524,11 @@ class spotExchangeIntradayB3 extends ReportLoaderCalendar {
       currencyCode: TCurrencyCode.USD,
     });
 
-    /* if (dateRef.hasSame(DateTime.now(), 'day')) {
+    if (dateRef.hasSame(DateTime.now(), 'day')) {
       this.throwBotEvent('SPOT-USD', {
         d: dateRef.toJSDate(),
       });
-    } */
+    }
 
     return { inserted: 1, deleted: 0 };
   }

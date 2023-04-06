@@ -64,7 +64,7 @@ export default class BotRoutes extends BaseRoutes {
 
         switch (String(e).toUpperCase()) {
           default:
-          case 'PTAX-USD':
+          case 'PTAX-USD-AVG':
             await new QueryPTAX(this.bot).process({
               dateRef,
               priorDays: p.q && isNumber(p.q) ? Number(p.q) : 2,
@@ -82,7 +82,6 @@ export default class BotRoutes extends BaseRoutes {
             await new QuerySPOT(this.bot).process(
               {
                 dateRef,
-                dateRefFRP: true,
                 spotProjectionsQtty: 6,
                 spotProjectionsMultiplier: 1,
               },

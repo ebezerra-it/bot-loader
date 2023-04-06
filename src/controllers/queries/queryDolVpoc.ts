@@ -29,8 +29,9 @@ interface IDolVpoc {
   dateFrom: DateTime;
   dateTo: DateTime;
   assets: IAssetWeight[];
-  vpocs: IVpoc[];
   vwap: ILevel;
+  vpocs: IVpoc[];
+  negVpocs: IVpoc[];
 }
 
 export default class QueryDOLVpoc extends Query {
@@ -191,8 +192,8 @@ export default class QueryDOLVpoc extends Query {
     });
 
     let sql = `select level, sum(tt.volume) volume from 
-      (select coalesce(q1.level, q2.level) level, coalesce(q1.volume*0.2, 0) + coalesce(q2.volume, 0) volume  from
-      (select t.level, sum(t.volume) as volume from 
+      (select coalesce(q1.level, q2.level) level, coalesce(q1.volume, 0) + coalesce(q2.volume, 0) volume  from
+      (select t.level, sum(t.volume)*0.2 as volume from 
               (select (jsonb_array_elements("volume-profile"::JSONB)->>'level')::numeric as level, (jsonb_array_elements("volume-profile"::JSONB)->>'volume')::numeric as volume, (jsonb_array_elements("volume-profile"::JSONB)->>'quantity')::numeric as quantity from "b3-ts-summary" where asset = any($1) and "timestamp-open"::DATE>=$3 and "timestamp-open"::DATE<$4) t
               group by t.level) q1
       full outer join 
@@ -215,11 +216,11 @@ export default class QueryDOLVpoc extends Query {
     sql += `) tt group by level order by level asc`;
 
     const qDolVpoc = await this.bot.queryFactory.runQuery(sql, {
-      assetsDOL: assets
-        .filter(a => a.asset.substr(0, 3) === 'DOL')
-        .map(a => a.asset),
       assetsWDO: assets
         .filter(a => a.asset.substr(0, 3) === 'WDO')
+        .map(a => a.asset),
+      assetsDOL: assets
+        .filter(a => a.asset.substr(0, 3) === 'DOL')
         .map(a => a.asset),
       dateFrom: dateFrom.toJSDate(),
       dateTo: dateTo.toJSDate(),
@@ -271,13 +272,20 @@ export default class QueryDOLVpoc extends Query {
       return b.vwap.volume - a.vwap.volume;
     });
 
+    let negVpocs = vpocs.slice();
+    // sort by negVpoc volume ascending
+    negVpocs.sort((a, b) => {
+      return a.vwap.volume - b.vwap.volume;
+    });
+
     // remove samples in same cluster
     let end = false;
     let i = 0;
     while (!end) {
       for (let j = i + 1; j < vpocs.length; j++) {
         if (
-          Math.abs(vpocs[i].vwap.level - vpocs[j].vwap.level) < iClusterSize
+          Math.abs(vpocs[i].vwap.level - vpocs[j].vwap.level) <
+          iClusterSize / 2
         ) {
           vpocs.splice(j, 1);
           j--;
@@ -285,8 +293,24 @@ export default class QueryDOLVpoc extends Query {
       }
       if (++i > vpocs.length - 1) end = true;
     }
-
     vpocs = vpocs.slice(0, vpocSampleSize);
+
+    // remove samples in same cluster
+    end = false;
+    i = 0;
+    while (!end) {
+      for (let j = i + 1; j < negVpocs.length; j++) {
+        if (
+          Math.abs(negVpocs[i].vwap.level - negVpocs[j].vwap.level) <
+          iClusterSize / 2
+        ) {
+          negVpocs.splice(j, 1);
+          j--;
+        }
+      }
+      if (++i > negVpocs.length - 1) end = true;
+    }
+    negVpocs = negVpocs.slice(0, vpocSampleSize);
 
     // calculate vpocs vwap
     let sumLevelVol = 0;
@@ -302,6 +326,7 @@ export default class QueryDOLVpoc extends Query {
       dateTo,
       vwap: { level: +Number(sumLevelVol / sumVol).toFixed(2), volume: sumVol },
       vpocs,
+      negVpocs,
     };
   }
 }

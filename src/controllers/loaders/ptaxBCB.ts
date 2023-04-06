@@ -494,18 +494,18 @@ class PtaxBCB extends ReportLoaderCalendar {
     });
     inserted++;
 
-    /* if (
+    if (
       asset.currencyCode === TCurrencyCode.USD &&
       res.date.startOf('day').toMillis() ===
         DateTime.now().startOf('day').toMillis()
     ) {
-      this.throwBotEvent('PTAX-USD', { d: dateRef.toJSDate(), q: 2 });
+      this.throwBotEvent('PTAX-USD-AVG', { d: dateRef.toJSDate(), q: 2 });
       this.throwBotEvent('PTAX-USD-D0', {
         d: dateRef.toJSDate(),
         pq: 5,
         pm: 1.0,
       });
-    } */
+    }
 
     if (
       lastTaskOfDay &&

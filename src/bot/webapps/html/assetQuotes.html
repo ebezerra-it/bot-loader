@@ -23,6 +23,7 @@
                         document.getElementById('error').innerHTML += `${new Date()} - ${msg.data.errorMessage}\n`;
                     } else if (msg.type === 'DATA') {
                         if (msg.data) {
+                            if (msg.data.nextcontract) document.getElementById('nextcontract').innerHTML = `${JSON.stringify(msg.data.nextcontract, null, 4)}`;
                             if (msg.data.vpoc) document.getElementById('vpoc').innerHTML = `${JSON.stringify(msg.data.vpoc, null, 4)}`;
                             if (msg.data.ptaxd1) document.getElementById('ptaxd1').innerHTML = `${JSON.stringify(msg.data.ptaxd1, null, 4)}`;
                             if (msg.data.spotsettle) document.getElementById('spotsettle').innerHTML = `${JSON.stringify(msg.data.spotsettle, null, 4)}`;
@@ -130,6 +131,7 @@
                 <div class="live"><p class="caption">Assets books:</p><p class="content"><pre><code id="assetsbooks"></code></pre></p></div>
                 <div class="live"><p class="caption">Spot hired:</p><p class="content"><pre><code id="spothired"></code></pre></p></div>
 
+                <div class="static"><p class="caption">NEXT CONTRACT analisys:</p><p class="content"><pre><code id="nextcontract"></code></pre></p></div>
                 <div class="static"><p class="caption">VPOC analisys:</p><p class="content"><pre><code id="vpoc"></code></pre></p></div>
                 <div class="static"><p class="caption">PTAX D-1 analisys:</p><p class="content"><pre><code id="ptaxd1"></code></pre></p></div>
                 <div class="static"><p class="caption">Spot for settle date:</p><p class="content"><pre><code id="spotsettle"></code></pre></p></div>

@@ -19,9 +19,7 @@ import QueryPlayers, {
   IAssetWeight,
 } from '../../controllers/queries/queryPlayers';
 import QueryOI from '../../controllers/queries/queryOI';
-import QueryOptions, {
-  TFRPCalculationType,
-} from '../../controllers/queries/queryOptions';
+import QueryOptions from '../../controllers/queries/queryOptions';
 import QueryVolatility, {
   TAssetType,
 } from '../../controllers/queries/queryVolatility';
@@ -443,7 +441,6 @@ class QueryCommands extends BaseCommands {
     }
     await new QueryOptions(this.bot).process({
       dateRef,
-      frpCalculationType: TFRPCalculationType.SETTLE_D1,
       chatId: user.chatId,
       messageId: msg.replyToMessageId,
     });
@@ -651,7 +648,6 @@ class QueryCommands extends BaseCommands {
 
     await new QuerySPOT(this.bot).process({
       dateRef,
-      dateRefFRP: true,
       spotProjectionsQtty,
       spotProjectionsMultiplier,
       chatId: user.chatId,
@@ -1504,19 +1500,13 @@ class QueryCommands extends BaseCommands {
             ptax: p.ptax,
             band1: p.frp0.traded
               ? p.frp0.traded.vwap
-              : p.frp0.calculated.close_d1 && p.frp0.calculated.close_d1 > 0
-              ? p.frp0.calculated.close_d1
-              : p.frp0.calculated.settle_d1 && p.frp0.calculated.settle_d1 > 0
-              ? p.frp0.calculated.settle_d1
+              : p.frp0.calculated && p.frp0.calculated > 0
+              ? p.frp0.calculated
               : 0,
             band2:
               p.frp0Next && p.frp0Next.calculated
-                ? p.frp0Next.calculated.close_d1 &&
-                  p.frp0Next.calculated.close_d1 > 0
-                  ? p.frp0Next.calculated.close_d1
-                  : p.frp0Next.calculated.settle_d1 &&
-                    p.frp0Next.calculated.settle_d1 > 0
-                  ? p.frp0Next.calculated.settle_d1
+                ? p.frp0Next.calculated && p.frp0Next.calculated > 0
+                  ? p.frp0Next.calculated
                   : 0
                 : 0,
             high: p.high,
@@ -1630,12 +1620,11 @@ class QueryCommands extends BaseCommands {
 
     let dateRef = dateFrom;
     const aSPOT: any[] = [];
-    const dateRefFRP = true;
 
     while (dateRef <= dateTo) {
       const qSPOT: ISpotSettleDate | undefined = await new QuerySPOT(
         this.bot,
-      ).calculateSpotForSettleDate(dateRef, dateRefFRP);
+      ).calculateSpotForSettleDate(dateRef);
       if (qSPOT)
         aSPOT.push({
           date: qSPOT.today.date,
@@ -1651,9 +1640,9 @@ class QueryCommands extends BaseCommands {
           close_d2: qSPOT.priorDays[0].close,
           close_d1: qSPOT.priorDays[1].close,
           close_d0: qSPOT.today.close,
-          band_d2: qSPOT.priorDays[0].frp0.today,
-          band_d1: qSPOT.priorDays[1].frp0.today,
-          band_d0: qSPOT.today.frp0.today,
+          band_d2: qSPOT.priorDays[0].frp0.traded?.vwap,
+          band_d1: qSPOT.priorDays[1].frp0.traded?.vwap,
+          band_d0: qSPOT.today.frp0.traded?.vwap,
           vol_d2: Math.trunc(qSPOT.priorDays[0].volume),
           vol_d1: Math.trunc(qSPOT.priorDays[1].volume),
           vol_d0: Math.trunc(qSPOT.today.volume),
